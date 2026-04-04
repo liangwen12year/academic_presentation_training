@@ -16,6 +16,10 @@
       <h1>Presentation Training Coach</h1>
       <div class="subtitle">Upload slides, practice your delivery, get AI-powered feedback</div>
     </div>
+    <div class="mode-toggle">
+      <button class="mode-btn active" data-mode="no-avatar">Voice Only</button>
+      <button class="mode-btn" data-mode="avatar">Avatar Coach</button>
+    </div>
   </div>
 
   <div class="container">
@@ -106,6 +110,11 @@
         <!-- Sidebar -->
         <div class="sidebar">
 
+          <!-- Avatar Coach -->
+          <div id="avatar-container" class="card avatar-card hidden">
+            <canvas id="avatar-canvas"></canvas>
+          </div>
+
           <!-- Reference Audio -->
           <div class="card reference-section">
             <div class="section-header">Golden Reference</div>
@@ -163,6 +172,7 @@
     </div>
   </div>
 
+  <script src="/static/js/avatar.js"></script>
   <script src="/static/js/app.js"></script>
 </body>
 </html>

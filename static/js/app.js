@@ -14,6 +14,8 @@ const App = {
     analyzerNode: null,
     animFrameId: null,
     stream: null,
+    coachMode: localStorage.getItem('coachMode') || 'no-avatar',
+    avatarReactionTimeout: null,
   },
 
   // ── Initialization ─────────────────────────────────────────────
@@ -23,6 +25,67 @@ const App = {
     this.bindNavigation();
     this.bindRecording();
     this.bindVoiceSelect();
+    this.initAvatarMode();
+  },
+
+  // ── Avatar Mode ───────────────────────────────────────────────
+
+  initAvatarMode() {
+    // Bind mode toggle buttons
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.setCoachMode(btn.dataset.mode);
+      });
+    });
+
+    // Restore saved mode
+    const saved = this.state.coachMode;
+    document.querySelectorAll('.mode-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.mode === saved);
+    });
+    this.applyAvatarMode();
+  },
+
+  setCoachMode(mode) {
+    this.state.coachMode = mode;
+    localStorage.setItem('coachMode', mode);
+    this.applyAvatarMode();
+  },
+
+  applyAvatarMode() {
+    const container = document.getElementById('avatar-container');
+    if (this.state.coachMode === 'avatar') {
+      container.classList.remove('hidden');
+      if (!Avatar.canvas) {
+        Avatar.init(document.getElementById('avatar-canvas'));
+      }
+      Avatar.setState('idle');
+    } else {
+      container.classList.add('hidden');
+      if (Avatar.animId) {
+        Avatar.destroy();
+        Avatar.canvas = null;
+      }
+    }
+  },
+
+  updateAvatarState(newState, autoRevertMs) {
+    if (this.state.coachMode !== 'avatar' || !Avatar.canvas) return;
+    Avatar.setState(newState);
+
+    if (this.state.avatarReactionTimeout) {
+      clearTimeout(this.state.avatarReactionTimeout);
+      this.state.avatarReactionTimeout = null;
+    }
+
+    if (autoRevertMs) {
+      this.state.avatarReactionTimeout = setTimeout(() => {
+        Avatar.setState('idle');
+        this.state.avatarReactionTimeout = null;
+      }, autoRevertMs);
+    }
   },
 
   // ── Upload ─────────────────────────────────────────────────────
@@ -114,10 +177,14 @@ const App = {
     const textarea = document.getElementById('script-text');
     textarea.value = slide.script;
 
-    // Reference audio
+    // Reference audio — attach avatar speaking hooks
     const refSection = document.getElementById('ref-audio-container');
     if (slide.reference_audio_url) {
       refSection.innerHTML = `<audio controls src="${slide.reference_audio_url}"></audio>`;
+      const audio = refSection.querySelector('audio');
+      audio.addEventListener('play', () => this.updateAvatarState('speaking'));
+      audio.addEventListener('pause', () => this.updateAvatarState('idle'));
+      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
     } else {
       refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
     }
@@ -125,6 +192,8 @@ const App = {
     // Clear previous analysis
     document.getElementById('analysis-results').classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
+
+    this.updateAvatarState('idle');
   },
 
   // ── Script Editing ─────────────────────────────────────────────
@@ -190,6 +259,8 @@ const App = {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1.0;
+      utterance.onstart = () => this.updateAvatarState('speaking');
+      utterance.onend = () => this.updateAvatarState('idle');
       window.speechSynthesis.speak(utterance);
     } else {
       alert('No TTS available. Set ELEVENLABS_API_KEY in .env for reference audio.');
@@ -261,6 +332,7 @@ const App = {
       document.getElementById('recording-status').textContent = 'Recording...';
       document.getElementById('btn-submit-recording').disabled = true;
 
+      this.updateAvatarState('listening');
       this.drawWaveform();
     } catch (err) {
       alert('Microphone access denied: ' + err.message);
@@ -281,6 +353,8 @@ const App = {
     btn.classList.add('btn-primary');
     document.getElementById('recording-status').textContent = 'Recording complete';
     document.getElementById('btn-submit-recording').disabled = false;
+
+    this.updateAvatarState('idle');
   },
 
   drawWaveform() {
@@ -327,12 +401,14 @@ const App = {
 
     await this.saveScript();
     this.showLoading('Analyzing your recording...');
+    this.updateAvatarState('thinking');
 
     const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('slide_index', this.state.currentSlide);
     form.append('audio', blob, 'recording.webm');
+    form.append('coach_mode', this.state.coachMode);
 
     try {
       const res = await fetch('/api/analyze', { method: 'POST', body: form });
@@ -341,6 +417,7 @@ const App = {
       this.renderAnalysis(data);
     } catch (err) {
       alert('Analysis failed: ' + err.message);
+      this.updateAvatarState('idle');
     } finally {
       this.hideLoading();
     }
@@ -351,6 +428,13 @@ const App = {
   renderAnalysis(data) {
     const container = document.getElementById('analysis-results');
     container.classList.remove('hidden');
+
+    // Avatar reaction based on score
+    if (data.overall_score >= 70) {
+      this.updateAvatarState('encouraging', 5000);
+    } else {
+      this.updateAvatarState('concerned', 5000);
+    }
 
     // Overall score
     const scoreEl = document.getElementById('overall-score');

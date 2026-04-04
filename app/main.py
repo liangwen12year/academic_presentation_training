@@ -125,6 +125,7 @@ async def analyze(
     presentation_id: str = Form(...),
     slide_index: int = Form(...),
     audio: UploadFile = File(...),
+    coach_mode: str = Form("no-avatar"),
 ):
     """Submit a user recording for analysis against the slide script."""
     pres = sessions.get(presentation_id)
@@ -162,6 +163,11 @@ async def analyze(
         reference_duration=ref_duration,
     )
 
+    print(
+        f"[A/B] pres={presentation_id} slide={slide_index} "
+        f"mode={coach_mode} score={result.overall_score}"
+    )
+
     return {
         "transcript": result.transcript,
         "duration_seconds": result.duration_seconds,
@@ -170,6 +176,7 @@ async def analyze(
         "filler_count": result.filler_count,
         "filler_words": result.filler_words,
         "flagged_words": [asdict(fw) for fw in result.flagged_words],
+        "coach_mode": coach_mode,
     }
 
 

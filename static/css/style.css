@@ -35,6 +35,45 @@ body {
 .header h1 { font-size: 1.4rem; font-weight: 600; }
 .header .subtitle { font-size: 0.85rem; opacity: 0.8; }
 
+/* Mode Toggle */
+.mode-toggle {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+  background: rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 0.2rem;
+}
+.mode-btn {
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255,255,255,0.65);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.mode-btn:hover { color: rgba(255,255,255,0.9); }
+.mode-btn.active {
+  background: rgba(255,255,255,0.22);
+  color: white;
+  font-weight: 600;
+}
+
+/* Avatar Card */
+.avatar-card {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.avatar-card canvas {
+  width: 100%;
+  height: 280px;
+  display: block;
+  border-radius: var(--radius);
+}
+
 /* Layout */
 .container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
 
