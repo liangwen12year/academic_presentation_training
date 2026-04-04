@@ -1,7 +1,8 @@
 /**
  * Dynamic Avatar Coach — Canvas-based animated character
  *
- * States: idle, listening, thinking, speaking, encouraging, concerned
+ * States: idle, listening, thinking, speaking, encouraging, concerned,
+ *         pause_warning, pace_warning, filler_warning, celebrating, demonstrating
  */
 
 const Avatar = {
@@ -41,6 +42,8 @@ const Avatar = {
   nodCount: 0,
 
   state: 'idle',
+  prevState: 'idle',     // for returning after brief reactions
+  reactionTimeout: null, // auto-revert timer for brief states
 
   // Color palette (matches app theme)
   colors: {
@@ -169,7 +172,73 @@ const Avatar = {
         t.eyebrowRaise = 0.5;
         t.blush = 0;
         break;
+
+      case 'pause_warning':
+        t.eyeOpenness = 1.15;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.mouthOpenness = 0.1;
+        t.mouthCurve = -0.1;
+        t.headTilt = 0.06;
+        t.eyebrowRaise = 0.6;
+        t.blush = 0;
+        break;
+
+      case 'pace_warning':
+        t.eyeOpenness = 0.9;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.mouthOpenness = 0.02;
+        t.mouthCurve = -0.15;
+        t.headTilt = -0.03;
+        t.eyebrowRaise = 0.35;
+        t.blush = 0;
+        break;
+
+      case 'filler_warning':
+        t.eyeOpenness = 1.05;
+        t.pupilX = 0.15;
+        t.pupilY = -0.1;
+        t.mouthOpenness = 0;
+        t.mouthCurve = 0;
+        t.headTilt = 0;
+        t.eyebrowRaise = 0.7;
+        t.blush = 0;
+        break;
+
+      case 'celebrating':
+        t.eyeOpenness = 0.7;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.mouthOpenness = 0.25;
+        t.mouthCurve = 1.0;
+        t.headTilt = 0;
+        t.eyebrowRaise = 0.3;
+        t.blush = 0.9;
+        break;
+
+      case 'demonstrating':
+        t.eyeOpenness = 0.95;
+        t.pupilX = 0;
+        t.pupilY = 0.1;
+        t.mouthCurve = 0.05;
+        t.headTilt = 0;
+        t.eyebrowRaise = 0;
+        t.blush = 0;
+        // mouthOpenness is driven by setAmplitude
+        break;
     }
+  },
+
+  // Brief reaction: show state momentarily then revert
+  briefReaction(state, durationMs) {
+    if (this.reactionTimeout) clearTimeout(this.reactionTimeout);
+    this.prevState = this.state;
+    this.setState(state);
+    this.reactionTimeout = setTimeout(() => {
+      this.setState(this.prevState);
+      this.reactionTimeout = null;
+    }, durationMs || 1500);
   },
 
   // ── Animation Loop ────────────────────────────────────────────
@@ -583,6 +652,11 @@ const Avatar = {
       speaking: 'Speaking...',
       encouraging: 'Great job!',
       concerned: 'Let\'s try again',
+      pause_warning: 'Keep going!',
+      pace_warning: 'Watch your pace',
+      filler_warning: 'Filler detected',
+      celebrating: 'New personal best!',
+      demonstrating: 'Listen carefully...',
     };
     const label = labels[this.state];
     if (!label) return;

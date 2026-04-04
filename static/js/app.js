@@ -16,6 +16,8 @@ const App = {
     stream: null,
     coachMode: localStorage.getItem('coachMode') || 'no-avatar',
     avatarReactionTimeout: null,
+    audienceMode: false,
+    realtimeCoachActive: false,
   },
 
   // ── Initialization ─────────────────────────────────────────────
@@ -26,12 +28,12 @@ const App = {
     this.bindRecording();
     this.bindVoiceSelect();
     this.initAvatarMode();
+    this.renderSessionStats();
   },
 
   // ── Avatar Mode ───────────────────────────────────────────────
 
   initAvatarMode() {
-    // Bind mode toggle buttons
     document.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
@@ -55,19 +57,26 @@ const App = {
   },
 
   applyAvatarMode() {
-    const container = document.getElementById('avatar-container');
+    const avatarContainer = document.getElementById('avatar-container');
+    const audienceContainer = document.getElementById('audience-container');
+
     if (this.state.coachMode === 'avatar') {
-      container.classList.remove('hidden');
+      avatarContainer.classList.remove('hidden');
+      audienceContainer.classList.remove('hidden');
       if (!Avatar.canvas) {
         Avatar.init(document.getElementById('avatar-canvas'));
       }
-      Avatar.setState('idle');
-    } else {
-      container.classList.add('hidden');
-      if (Avatar.animId) {
-        Avatar.destroy();
-        Avatar.canvas = null;
+      if (!Audience.canvas) {
+        Audience.init(document.getElementById('audience-canvas'), 5);
       }
+      Avatar.setState('idle');
+      this.state.audienceMode = true;
+    } else {
+      avatarContainer.classList.add('hidden');
+      audienceContainer.classList.add('hidden');
+      if (Avatar.animId) { Avatar.destroy(); Avatar.canvas = null; }
+      if (Audience.animId) { Audience.destroy(); Audience.canvas = null; }
+      this.state.audienceMode = false;
     }
   },
 
@@ -85,6 +94,15 @@ const App = {
         Avatar.setState('idle');
         this.state.avatarReactionTimeout = null;
       }, autoRevertMs);
+    }
+  },
+
+  // ── Session Stats ─────────────────────────────────────────────
+
+  renderSessionStats() {
+    const el = document.getElementById('session-stats-content');
+    if (el) {
+      el.innerHTML = SessionTracker.getStatsHTML();
     }
   },
 
@@ -192,6 +210,10 @@ const App = {
     // Clear previous analysis
     document.getElementById('analysis-results').classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
+
+    // Hide realtime feedback
+    const rtFeedback = document.getElementById('realtime-feedback');
+    if (rtFeedback) rtFeedback.classList.add('hidden');
 
     this.updateAvatarState('idle');
   },
@@ -333,6 +355,7 @@ const App = {
       document.getElementById('btn-submit-recording').disabled = true;
 
       this.updateAvatarState('listening');
+      this.startRealtimeCoach(analyser);
       this.drawWaveform();
     } catch (err) {
       alert('Microphone access denied: ' + err.message);
@@ -354,7 +377,120 @@ const App = {
     document.getElementById('recording-status').textContent = 'Recording complete';
     document.getElementById('btn-submit-recording').disabled = false;
 
+    this.stopRealtimeCoach();
     this.updateAvatarState('idle');
+  },
+
+  // ── Real-time Coaching ────────────────────────────────────────
+
+  startRealtimeCoach(analyserNode) {
+    this.state.realtimeCoachActive = true;
+
+    // Show realtime feedback panel
+    const rtPanel = document.getElementById('realtime-feedback');
+    if (rtPanel) {
+      rtPanel.classList.remove('hidden');
+      document.getElementById('rt-pace-indicator').textContent = '--';
+      document.getElementById('rt-filler-count').textContent = '0';
+      document.getElementById('rt-energy-bar').style.width = '0%';
+      document.getElementById('rt-alerts').innerHTML = '';
+    }
+
+    RealtimeCoach.onPauseTooLong = () => {
+      if (Avatar.canvas) Avatar.briefReaction('pause_warning', 2000);
+      this.addRealtimeAlert('Long pause detected — keep going!', 'warning');
+      // Audience loses some attention during pauses
+      if (this.state.audienceMode && Audience.canvas) {
+        Audience.setEngagement(Math.max(0.2, Audience.overallEngagement - 0.1));
+      }
+    };
+
+    RealtimeCoach.onPaceChange = (pace) => {
+      const indicator = document.getElementById('rt-pace-indicator');
+      if (indicator) {
+        if (pace === 'fast') {
+          indicator.textContent = 'Too Fast';
+          indicator.className = 'rt-pace danger';
+          if (Avatar.canvas && Avatar.state === 'listening') {
+            Avatar.briefReaction('pace_warning', 1500);
+          }
+        } else if (pace === 'slow') {
+          indicator.textContent = 'Too Slow';
+          indicator.className = 'rt-pace warning';
+        } else {
+          indicator.textContent = 'Good';
+          indicator.className = 'rt-pace good';
+        }
+      }
+
+      // Audience engagement reacts to pace
+      if (this.state.audienceMode && Audience.canvas) {
+        if (pace === 'good') {
+          Audience.setEngagement(Math.min(1, Audience.overallEngagement + 0.02));
+        } else {
+          Audience.setEngagement(Math.max(0.2, Audience.overallEngagement - 0.02));
+        }
+      }
+    };
+
+    RealtimeCoach.onFillerDetected = (word) => {
+      if (Avatar.canvas) Avatar.briefReaction('filler_warning', 1200);
+      const countEl = document.getElementById('rt-filler-count');
+      if (countEl) countEl.textContent = RealtimeCoach.stats.fillerCount;
+      this.addRealtimeAlert(`Filler: "${word}"`, 'filler');
+    };
+
+    RealtimeCoach.onEnergyUpdate = (level) => {
+      const bar = document.getElementById('rt-energy-bar');
+      if (bar) bar.style.width = `${level * 100}%`;
+
+      // Feed energy to avatar mouth when in listening state (subtle reactivity)
+      if (Avatar.canvas && Avatar.state === 'listening') {
+        Avatar.setAmplitude(level * 0.3); // subtle mouth movement mirroring speaker
+      }
+
+      // Audience engagement correlates with speaker energy
+      if (this.state.audienceMode && Audience.canvas) {
+        Audience.setSpeakerEnergy(level);
+        // Sustained good energy boosts engagement
+        if (level > 0.3) {
+          Audience.setEngagement(Math.min(1, Audience.overallEngagement + 0.001));
+          // Random audience nods when energy is good
+          if (Math.random() < 0.003) {
+            Audience.triggerNod();
+          }
+        }
+      }
+    };
+
+    RealtimeCoach.start(analyserNode);
+  },
+
+  stopRealtimeCoach() {
+    if (!this.state.realtimeCoachActive) return;
+    this.state.realtimeCoachActive = false;
+    RealtimeCoach.stop();
+  },
+
+  addRealtimeAlert(message, type) {
+    const container = document.getElementById('rt-alerts');
+    if (!container) return;
+
+    const alert = document.createElement('div');
+    alert.className = `rt-alert rt-alert-${type}`;
+    alert.textContent = message;
+    container.prepend(alert);
+
+    // Keep only last 5 alerts
+    while (container.children.length > 5) {
+      container.removeChild(container.lastChild);
+    }
+
+    // Fade out after 3s
+    setTimeout(() => {
+      alert.style.opacity = '0';
+      setTimeout(() => alert.remove(), 300);
+    }, 3000);
   },
 
   drawWaveform() {
@@ -429,12 +565,45 @@ const App = {
     const container = document.getElementById('analysis-results');
     container.classList.remove('hidden');
 
-    // Avatar reaction based on score
-    if (data.overall_score >= 70) {
+    // Record session
+    const sessionEntry = SessionTracker.recordSession({
+      slideIndex: this.state.currentSlide,
+      score: data.overall_score,
+      wpm: data.pacing.user_wpm,
+      fillerCount: data.filler_count,
+      duration: data.duration_seconds,
+      coachMode: this.state.coachMode,
+    });
+
+    // Check personal best and show appropriate avatar reaction
+    const isNewBest = SessionTracker.isNewPersonalBest(data.overall_score);
+
+    if (isNewBest) {
+      this.updateAvatarState('celebrating', 6000);
+      if (this.state.audienceMode && Audience.canvas) {
+        Audience.triggerConfetti();
+      }
+    } else if (data.overall_score >= 70) {
       this.updateAvatarState('encouraging', 5000);
     } else {
       this.updateAvatarState('concerned', 5000);
     }
+
+    // Coaching message
+    const coachMsg = SessionTracker.getEncouragingMessage(data.overall_score);
+    const coachMsgEl = document.getElementById('coach-message');
+    if (coachMsgEl) {
+      coachMsgEl.textContent = coachMsg;
+      coachMsgEl.classList.remove('hidden');
+
+      // Avatar speaks the coaching message
+      if (this.state.coachMode === 'avatar') {
+        setTimeout(() => this.speakCoachFeedback(coachMsg, data), 1000);
+      }
+    }
+
+    // Update session stats display
+    this.renderSessionStats();
 
     // Overall score
     const scoreEl = document.getElementById('overall-score');
@@ -506,9 +675,48 @@ const App = {
     container.scrollIntoView({ behavior: 'smooth' });
   },
 
+  // ── Post-Analysis Coaching ────────────────────────────────────
+
+  speakCoachFeedback(message, data) {
+    if (!('speechSynthesis' in window)) return;
+
+    // Build a comprehensive spoken summary
+    let spoken = message + '. ';
+
+    if (data.pacing.assessment === 'too_fast') {
+      spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
+    } else if (data.pacing.assessment === 'too_slow') {
+      spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
+    } else {
+      spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;
+    }
+
+    if (data.filler_count > 0) {
+      spoken += `I noticed ${data.filler_count} filler word${data.filler_count > 1 ? 's' : ''}. Try to reduce those in your next attempt. `;
+    }
+
+    if (data.flagged_words.length > 0) {
+      const redCount = data.flagged_words.filter((f) => f.flag === 'red').length;
+      if (redCount > 0) {
+        spoken += `There were ${redCount} pronunciation issue${redCount > 1 ? 's' : ''} to work on. Click the flagged words to hear the correct pronunciation. `;
+      }
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(spoken);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.onstart = () => this.updateAvatarState('speaking');
+    utterance.onend = () => this.updateAvatarState('idle');
+    window.speechSynthesis.speak(utterance);
+  },
+
   // ── Pronunciation Playback ─────────────────────────────────────
 
   async pronounceWord(word) {
+    // Avatar demonstrates the word
+    this.updateAvatarState('demonstrating');
+
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('word', word);
@@ -523,7 +731,9 @@ const App = {
         throw new Error(await res.text());
       }
       const data = await res.json();
-      new Audio(data.audio_url).play();
+      const audio = new Audio(data.audio_url);
+      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
+      audio.play();
     } catch (err) {
       this.speakWithBrowser(word);
     }

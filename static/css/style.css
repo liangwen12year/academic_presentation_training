@@ -408,3 +408,127 @@ body {
   border-radius: 4px;
   font-size: 0.8rem;
 }
+
+/* ── Coach Message ─────────────────────────────────────────────── */
+.coach-message {
+  background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+  border-left: 4px solid var(--primary);
+  padding: 0.75rem 1rem;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--primary-dark);
+  margin-bottom: 1rem;
+}
+
+/* ── Real-time Feedback Panel ──────────────────────────────────── */
+.realtime-feedback {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #f5f3ff;
+  border-radius: 8px;
+  border: 1px solid #e0d4f5;
+}
+.rt-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.rt-row:last-child { margin-bottom: 0; }
+.rt-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 50px;
+}
+.rt-pace {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+.rt-pace.good { background: #d1fae5; color: #065f46; }
+.rt-pace.warning { background: #fef3c7; color: #92400e; }
+.rt-pace.danger { background: #fee2e2; color: #991b1b; }
+
+.rt-energy-track {
+  flex: 1;
+  height: 6px;
+  background: #e0d4f5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.rt-energy-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.1s;
+  width: 0;
+}
+
+.rt-filler-count {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--warning);
+}
+
+.rt-alerts {
+  margin-top: 0.4rem;
+}
+.rt-alert {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.25rem;
+  transition: opacity 0.3s;
+}
+.rt-alert-warning { background: #fef3c7; color: #92400e; }
+.rt-alert-filler { background: #fee2e2; color: #991b1b; }
+
+/* ── Session Stats ─────────────────────────────────────────────── */
+.session-stats-card {
+  text-align: center;
+}
+.session-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.stat-item {
+  padding: 0.4rem;
+  background: var(--bg);
+  border-radius: 6px;
+}
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.stat-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+.session-stats-empty {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: 0.5rem;
+}
+.difficulty-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.difficulty-badge.beginner { background: #d1fae5; color: #065f46; }
+.difficulty-badge.intermediate { background: #dbeafe; color: #1e40af; }
+.difficulty-badge.expert { background: #fce7f3; color: #9d174d; }
+
+/* ── Audience Canvas ───────────────────────────────────────────── */
+#audience-canvas {
+  height: 200px;
+}
