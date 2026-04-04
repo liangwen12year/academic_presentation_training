@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+uploads/
+static/slides/
+static/audio/
+*.pyc

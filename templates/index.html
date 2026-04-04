@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presentation Training Coach</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>Presentation Training Coach</h1>
+      <div class="subtitle">Upload slides, practice your delivery, get AI-powered feedback</div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Upload Section -->
+    <div id="upload-section">
+      <div class="upload-area" id="upload-area">
+        <div class="icon">📊</div>
+        <h2>Upload Your Slide Deck</h2>
+        <p>Drag & drop a .pptx file here, or click to browse</p>
+        <input type="file" id="file-input" accept=".pptx" class="hidden">
+      </div>
+    </div>
+
+    <!-- Practice Section -->
+    <div id="practice-section" class="hidden">
+      <div class="practice-layout">
+
+        <!-- Main: Slide Viewer + Script -->
+        <div>
+          <div class="card">
+            <div class="slide-viewer">
+              <img id="slide-image" src="" alt="Slide">
+            </div>
+            <div class="slide-nav">
+              <button id="btn-prev" class="btn btn-outline btn-sm" disabled>&larr; Previous</button>
+              <span id="slide-counter" class="slide-counter">Slide 1 of 1</span>
+              <button id="btn-next" class="btn btn-outline btn-sm">&rarr; Next</button>
+            </div>
+          </div>
+
+          <div class="card script-panel" style="margin-top: 1rem;">
+            <label for="script-text">Speaker Script <span style="font-weight:normal;color:var(--text-secondary);">(editable)</span></label>
+            <textarea id="script-text" placeholder="Script will appear here after upload..."></textarea>
+          </div>
+
+          <!-- Analysis Results -->
+          <div id="analysis-results" class="card analysis-results hidden">
+            <h3 class="section-header">Analysis Results</h3>
+
+            <div style="text-align:center; margin: 1rem 0;">
+              <div style="font-size:3rem; font-weight:700;" id="overall-score">--</div>
+              <div style="font-size:0.8rem; color:var(--text-secondary);">Overall Score</div>
+            </div>
+
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <div class="metric-value" id="metric-wpm">--</div>
+                <div class="metric-label">Words/min</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="metric-fillers">--</div>
+                <div class="metric-label">Filler Words</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="metric-duration">--</div>
+                <div class="metric-label">Duration</div>
+              </div>
+            </div>
+
+            <!-- Pacing -->
+            <div style="margin-top: 1rem;">
+              <div class="section-header">Pacing</div>
+              <p id="pacing-detail" style="font-size:0.85rem; margin-top:0.5rem;"></p>
+              <span id="pacing-badge" class="filler-tag" style="margin-top:0.25rem;display:inline-block;"></span>
+            </div>
+
+            <!-- Filler Words -->
+            <div style="margin-top: 1rem;">
+              <div class="section-header">Filler Words</div>
+              <div id="filler-list" class="filler-summary"></div>
+            </div>
+
+            <!-- Flagged Words -->
+            <div style="margin-top: 1rem;">
+              <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(click to hear correct pronunciation)</span></div>
+              <div id="flagged-list" class="flagged-list"></div>
+            </div>
+
+            <!-- Transcript -->
+            <div style="margin-top: 1rem;">
+              <div class="section-header">Your Transcript</div>
+              <div id="transcript-text" class="transcript"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+
+          <!-- Reference Audio -->
+          <div class="card reference-section">
+            <div class="section-header">Golden Reference</div>
+
+            <div>
+              <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.4rem;">Voice Persona</label>
+              <div class="voice-select">
+                <div class="voice-option active" data-voice="professional">Professional</div>
+                <div class="voice-option" data-voice="casual">Casual</div>
+                <div class="voice-option" data-voice="authoritative">Authoritative</div>
+              </div>
+            </div>
+
+            <div id="ref-audio-container" style="margin-top: 0.75rem;">
+              <p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>
+            </div>
+
+            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;" onclick="App.generateReference()">
+              Generate for This Slide
+            </button>
+            <button class="btn btn-outline btn-block btn-sm" style="margin-top:0.4rem;" onclick="App.generateAllReferences()">
+              Generate for All Slides
+            </button>
+          </div>
+
+          <!-- Recording -->
+          <div class="card recording-section">
+            <div class="section-header">Your Recording</div>
+
+            <div class="waveform-container">
+              <canvas id="waveform-canvas"></canvas>
+            </div>
+
+            <div class="rec-controls">
+              <button id="btn-record" class="btn btn-primary">🎙 Start Recording</button>
+            </div>
+            <div id="recording-status" class="status">Ready to record</div>
+
+            <button id="btn-submit-recording" class="btn btn-primary btn-block" style="margin-top:0.75rem;" disabled onclick="App.submitRecording()">
+              Analyze Recording
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p>Processing...</p>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
