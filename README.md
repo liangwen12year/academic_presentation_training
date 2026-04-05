@@ -176,7 +176,18 @@ cp .env.example .env
 | `LLM_PROVIDER` | Optional | `"openai"` (default) or `"gemini"` |
 | `WHISPER_MODEL` | Optional | Whisper model size: `tiny`, `base` (default), `small`, `medium`, `large`. Larger = more accurate but slower. |
 
-**The app works with zero API keys** — it falls back to browser TTS for audio and uses slide text as scripts. API keys unlock higher-quality output.
+**The app works with zero API keys** — it degrades gracefully with the following fallback behavior:
+
+| Feature | With Valid API Key | Without Valid API Key |
+|---------|-------------------|----------------------|
+| **Script Generation** | LLM generates a natural speaker script from slide content (OpenAI GPT-4o-mini or Google Gemini) | Uses raw slide text as the script; if a slide has no text, defaults to "This is slide N." |
+| **Golden Reference Audio** | High-quality ElevenLabs TTS with selectable voice personas (Professional, Casual, Authoritative) | Falls back to browser's built-in `SpeechSynthesis` API (voice quality varies by browser/OS). If the browser lacks `SpeechSynthesis`, an alert prompts the user to configure `ELEVENLABS_API_KEY`. |
+| **Pronunciation Playback** | Click a flagged word to hear correct pronunciation via ElevenLabs TTS | Falls back to browser `SpeechSynthesis`. If unavailable, pronunciation playback is disabled. |
+| **Recording & Analysis** | Fully functional — uses local Whisper model (no API key needed) | Same — Whisper runs locally, no external API required |
+| **Avatar Coach & Audience** | Fully functional — runs entirely client-side | Same — no API dependency |
+| **Real-time Coaching** | Fully functional — uses Web Audio API and Web Speech API | Same — no API dependency |
+
+> **Note:** A key is considered invalid if it is empty, unset, or starts with `your-` (the placeholder value from `.env.example`). Invalid keys are treated the same as missing keys — the app silently falls back rather than sending bad requests to external APIs.
 
 ### Running
 
