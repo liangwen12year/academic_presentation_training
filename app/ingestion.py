@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import subprocess
+import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,15 +33,109 @@ class PresentationData:
     slides: list[SlideData]
 
 
-def _extract_slide_image(prs: Presentation, slide, slide_idx: int, pres_id: str) -> str:
-    """Export a slide as a PNG image.
+def _render_slides_with_libreoffice(pptx_path: Path, pres_id: str) -> list[str] | None:
+    """Render all slides to PNG using LibreOffice headless. Returns list of served paths or None on failure."""
+    out_dir = settings.slides_dir / pres_id
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    python-pptx cannot render slides directly, so we composite all images
-    and shapes into a blank canvas sized to the slide dimensions.
-    For a production system you'd use LibreOffice headless or a similar renderer.
-    Here we create a simple thumbnail from any images on the slide, or a
-    placeholder if no images exist.
-    """
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        try:
+            subprocess.run(
+                [
+                    "libreoffice",
+                    "--headless",
+                    "--convert-to",
+                    "png",
+                    "--outdir",
+                    tmp_dir,
+                    str(pptx_path),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=120,
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+
+        # LibreOffice exports one PNG per slide, named like "filename.png" for single-slide
+        # or uses a PDF intermediate. For multi-slide, we convert via PDF first.
+        png_files = sorted(Path(tmp_dir).glob("*.png"))
+
+        if png_files:
+            # Single-slide export: LibreOffice only produces one PNG for the whole file.
+            # We need to go through PDF to get per-slide images.
+            if len(png_files) == 1:
+                # Check if it's truly a single-slide presentation
+                prs = Presentation(str(pptx_path))
+                if len(prs.slides) > 1:
+                    png_files = []  # Fall through to PDF approach
+
+        if not png_files:
+            # Use PDF intermediate for per-slide rendering
+            try:
+                subprocess.run(
+                    [
+                        "libreoffice",
+                        "--headless",
+                        "--convert-to",
+                        "pdf",
+                        "--outdir",
+                        tmp_dir,
+                        str(pptx_path),
+                    ],
+                    check=True,
+                    capture_output=True,
+                    timeout=120,
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                return None
+
+            pdf_files = list(Path(tmp_dir).glob("*.pdf"))
+            if not pdf_files:
+                return None
+
+            pdf_path = pdf_files[0]
+            try:
+                from pdf2image import convert_from_path
+
+                images = convert_from_path(str(pdf_path), dpi=200)
+                paths = []
+                for idx, img in enumerate(images):
+                    filename = f"slide_{idx:03d}.png"
+                    img.save(str(out_dir / filename), "PNG")
+                    paths.append(f"/static/slides/{pres_id}/{filename}")
+                return paths
+            except ImportError:
+                # pdf2image not installed, try pdftoppm
+                try:
+                    subprocess.run(
+                        [
+                            "pdftoppm",
+                            "-png",
+                            "-r",
+                            "200",
+                            str(pdf_path),
+                            str(Path(tmp_dir) / "slide"),
+                        ],
+                        check=True,
+                        capture_output=True,
+                        timeout=120,
+                    )
+                    png_files = sorted(Path(tmp_dir).glob("slide-*.png"))
+                except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+                    return None
+
+        paths = []
+        for idx, png_file in enumerate(png_files):
+            filename = f"slide_{idx:03d}.png"
+            dest = out_dir / filename
+            Image.open(png_file).save(str(dest), "PNG")
+            paths.append(f"/static/slides/{pres_id}/{filename}")
+        return paths if paths else None
+
+
+def _extract_slide_image_fallback(prs: Presentation, slide, slide_idx: int, pres_id: str) -> str:
+    """Fallback slide image export using python-pptx shape compositing."""
     width = prs.slide_width or Emu(9144000)
     height = prs.slide_height or Emu(6858000)
     px_w = int(width / 9525)
@@ -47,7 +143,6 @@ def _extract_slide_image(prs: Presentation, slide, slide_idx: int, pres_id: str)
 
     canvas = Image.new("RGB", (px_w, px_h), "#FFFFFF")
 
-    # Try to composite images found on the slide
     for shape in slide.shapes:
         if shape.shape_type == 13:  # picture
             img_bytes = shape.image.blob
@@ -62,7 +157,6 @@ def _extract_slide_image(prs: Presentation, slide, slide_idx: int, pres_id: str)
             except Exception:
                 pass
 
-    # If canvas is still blank, draw slide number text
     if canvas.getcolors(maxcolors=2) and len(canvas.getcolors(maxcolors=2)) == 1:
         from PIL import ImageDraw, ImageFont
 
@@ -77,7 +171,6 @@ def _extract_slide_image(prs: Presentation, slide, slide_idx: int, pres_id: str)
         tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
         draw.text(((px_w - tw) / 2, (px_h - th) / 2), text, fill="#333355", font=font)
 
-        # Also render any text from shapes
         y_offset = (px_h - th) / 2 + th + 30
         for shape in slide.shapes:
             if shape.has_text_frame:
@@ -168,10 +261,22 @@ async def ingest_pptx(filepath: Path) -> PresentationData:
     """Parse a PPTX file and return structured slide data."""
     pres_id = uuid.uuid4().hex[:12]
     prs = Presentation(str(filepath))
+
+    # Try LibreOffice rendering for full-fidelity slide images
+    lo_paths = _render_slides_with_libreoffice(filepath, pres_id)
+    if lo_paths:
+        print(f"[INFO] Rendered {len(lo_paths)} slides with LibreOffice")
+    else:
+        print("[WARN] LibreOffice rendering failed, using fallback compositing")
+
     slides: list[SlideData] = []
 
     for idx, slide in enumerate(prs.slides):
-        image_path = _extract_slide_image(prs, slide, idx, pres_id)
+        if lo_paths and idx < len(lo_paths):
+            image_path = lo_paths[idx]
+        else:
+            image_path = _extract_slide_image_fallback(prs, slide, idx, pres_id)
+
         notes = _extract_notes(slide)
 
         if notes:
