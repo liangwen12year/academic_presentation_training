@@ -589,17 +589,20 @@ const App = {
       this.updateAvatarState('concerned', 5000);
     }
 
-    // Coaching message
+    // Coaching message (text only, no speech)
     const coachMsg = SessionTracker.getEncouragingMessage(data.overall_score);
     const coachMsgEl = document.getElementById('coach-message');
     if (coachMsgEl) {
       coachMsgEl.textContent = coachMsg;
       coachMsgEl.classList.remove('hidden');
+    }
 
-      // Avatar speaks the coaching message
-      if (this.state.coachMode === 'avatar') {
-        setTimeout(() => this.speakCoachFeedback(coachMsg, data), 1000);
-      }
+    // Recording playback
+    const playbackEl = document.getElementById('recording-playback');
+    if (playbackEl && this.state.audioChunks.length) {
+      const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
+      const url = URL.createObjectURL(blob);
+      playbackEl.innerHTML = `<audio controls src="${url}" style="width:100%;"></audio>`;
     }
 
     // Update session stats display
