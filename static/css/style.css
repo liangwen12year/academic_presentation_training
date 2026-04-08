@@ -226,6 +226,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   text-align: center;
+  position: relative;
   cursor: pointer;
   font-size: 0.8rem;
   transition: all 0.15s;
@@ -235,6 +236,25 @@ body {
   border-color: var(--primary);
   background: #f0f0ff;
   font-weight: 600;
+}
+.voice-option.clone-ready {
+  border-color: var(--success);
+  position: relative;
+}
+.voice-option.clone-ready::after {
+  content: "\2713";
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--success);
+  color: white;
+  font-size: 0.6rem;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Analysis results */
@@ -368,6 +388,7 @@ body {
   animation: spin 0.6s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 .loading-overlay {
   position: fixed;

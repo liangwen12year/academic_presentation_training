@@ -15,7 +15,7 @@ from starlette.requests import Request
 
 from app.config import settings
 from app.ingestion import PresentationData, ingest_pptx
-from app.tts import generate_reference_audio, generate_word_audio
+from app.tts import clone_voice, generate_reference_audio, generate_word_audio, get_cloned_voice_id
 from app.analysis import analyze_recording
 
 app = FastAPI(title="Presentation Training Coach")
@@ -60,6 +60,41 @@ async def upload_pptx(file: UploadFile = File(...)):
             for s in pres.slides
         ],
     }
+
+
+@app.post("/api/clone-voice")
+async def clone_voice_endpoint(
+    presentation_id: str = Form(...),
+    audio: UploadFile = File(...),
+    name: str = Form("My Voice"),
+):
+    """Upload a voice sample to create a cloned voice persona."""
+    pres = sessions.get(presentation_id)
+    if not pres:
+        raise HTTPException(404, "Presentation not found")
+
+    # Save the voice sample
+    clone_dir = settings.audio_dir / pres.id / "clone"
+    clone_dir.mkdir(parents=True, exist_ok=True)
+    sample_path = clone_dir / f"voice_sample_{audio.filename}"
+    with open(sample_path, "wb") as f:
+        shutil.copyfileobj(audio.file, f)
+
+    try:
+        voice_id = await clone_voice(sample_path, pres.id, name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Voice cloning failed: {str(e)}")
+
+    return {"voice_id": voice_id, "name": name}
+
+
+@app.get("/api/clone-voice-status/{presentation_id}")
+async def clone_voice_status(presentation_id: str):
+    """Check if a cloned voice exists for this presentation."""
+    voice_id = get_cloned_voice_id(presentation_id)
+    return {"has_clone": voice_id is not None}
 
 
 @app.post("/api/generate-reference")

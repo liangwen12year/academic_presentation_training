@@ -207,8 +207,10 @@ const App = {
       refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
     }
 
-    // Clear previous analysis
+    // Clear previous analysis and recording review
     document.getElementById('analysis-results').classList.add('hidden');
+    const reviewCard = document.getElementById('recording-review');
+    if (reviewCard) reviewCard.classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
 
     // Hide realtime feedback
@@ -239,6 +241,14 @@ const App = {
         document.querySelectorAll('.voice-option').forEach((v) => v.classList.remove('active'));
         el.classList.add('active');
         this.state.persona = el.dataset.voice;
+
+        // Show/hide clone upload section
+        const cloneSection = document.getElementById('voice-clone-section');
+        if (el.dataset.voice === 'clone') {
+          cloneSection.classList.remove('hidden');
+        } else {
+          cloneSection.classList.add('hidden');
+        }
       });
     });
   },
@@ -308,6 +318,110 @@ const App = {
       alert('Failed: ' + err.message);
     } finally {
       this.hideLoading();
+    }
+  },
+
+  // ── Voice Cloning ──────────────────────────────────────────────
+
+  cloneRecorder: null,
+  cloneChunks: [],
+  cloneTimerInterval: null,
+  cloneStartTime: null,
+
+  async cloneFromFile() {
+    const input = document.getElementById('voice-clone-input');
+    if (!input.files.length) return;
+    const blob = input.files[0];
+    await this._submitClone(blob, input.files[0].name.replace(/\.[^.]+$/, ''));
+  },
+
+  async toggleCloneRecording() {
+    if (this.cloneRecorder && this.cloneRecorder.state === 'recording') {
+      this.stopCloneRecording();
+    } else {
+      await this.startCloneRecording();
+    }
+  },
+
+  async startCloneRecording() {
+    const status = document.getElementById('clone-status');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.cloneChunks = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => this.cloneChunks.push(e.data);
+      recorder.start();
+      this.cloneRecorder = recorder;
+
+      const btn = document.getElementById('btn-clone-record');
+      btn.textContent = 'Stop Recording';
+      btn.classList.remove('btn-outline');
+      btn.classList.add('btn-danger');
+
+      document.getElementById('clone-record-ui').classList.remove('hidden');
+      this.cloneStartTime = Date.now();
+      this.cloneTimerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - this.cloneStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = String(elapsed % 60).padStart(2, '0');
+        document.getElementById('clone-rec-timer').textContent = `${mins}:${secs}`;
+      }, 250);
+
+      status.textContent = 'Speak clearly for at least 10 seconds...';
+      status.style.color = 'var(--text-secondary)';
+
+      // Auto-stop handler when recorder stops
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        clearInterval(this.cloneTimerInterval);
+        document.getElementById('clone-record-ui').classList.add('hidden');
+
+        const btn = document.getElementById('btn-clone-record');
+        btn.textContent = 'Record Live';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-outline');
+
+        const blob = new Blob(this.cloneChunks, { type: 'audio/webm' });
+        await this._submitClone(blob, 'live-recording');
+      };
+    } catch (err) {
+      status.textContent = 'Microphone access denied: ' + err.message;
+      status.style.color = 'var(--danger)';
+    }
+  },
+
+  stopCloneRecording() {
+    if (this.cloneRecorder && this.cloneRecorder.state === 'recording') {
+      this.cloneRecorder.stop();
+    }
+  },
+
+  async _submitClone(blob, name) {
+    const status = document.getElementById('clone-status');
+
+    if (!this.state.presentationId) {
+      status.textContent = 'Please upload a presentation first.';
+      status.style.color = 'var(--danger)';
+      return;
+    }
+
+    status.textContent = 'Cloning voice... this may take a moment.';
+    status.style.color = 'var(--text-secondary)';
+
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('audio', blob, name + '.webm');
+    form.append('name', name);
+
+    try {
+      const res = await fetch('/api/clone-voice', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(await res.text());
+      status.textContent = 'Voice cloned successfully! Now generate reference audio.';
+      status.style.color = 'var(--success)';
+      document.getElementById('voice-clone-btn').classList.add('clone-ready');
+    } catch (err) {
+      status.textContent = 'Clone failed: ' + err.message;
+      status.style.color = 'var(--danger)';
     }
   },
 
@@ -597,13 +711,15 @@ const App = {
       coachMsgEl.classList.remove('hidden');
     }
 
-    // Recording playback
+    // Recording playback & transcript card
+    const reviewCard = document.getElementById('recording-review');
     const playbackEl = document.getElementById('recording-playback');
     if (playbackEl && this.state.audioChunks.length) {
       const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
       const url = URL.createObjectURL(blob);
       playbackEl.innerHTML = `<audio controls src="${url}" style="width:100%;"></audio>`;
     }
+    if (reviewCard) reviewCard.classList.remove('hidden');
 
     // Update session stats display
     this.renderSessionStats();

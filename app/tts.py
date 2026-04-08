@@ -11,6 +11,7 @@ VOICE_PRESETS = {
     "professional": {"stability": 0.60, "similarity_boost": 0.75, "style": 0.30},
     "casual": {"stability": 0.40, "similarity_boost": 0.65, "style": 0.50},
     "authoritative": {"stability": 0.75, "similarity_boost": 0.80, "style": 0.20},
+    "clone": {"stability": 0.50, "similarity_boost": 0.85, "style": 0.20},
 }
 
 # Default ElevenLabs voices
@@ -20,10 +21,43 @@ DEFAULT_VOICES = {
     "authoritative": "ErXwobaYiN019PkySvjV",  # Antoni
 }
 
+# In-memory store for cloned voice IDs
+cloned_voices: dict[str, str] = {}  # pres_id -> voice_id
+
 
 def _has_real_key() -> bool:
     key = settings.elevenlabs_api_key
     return bool(key) and not key.startswith("your-")
+
+
+async def clone_voice(audio_path: Path, pres_id: str, name: str = "My Voice") -> str:
+    """Clone a voice from an audio sample using ElevenLabs Instant Voice Cloning.
+
+    Returns the cloned voice ID.
+    """
+    if not _has_real_key():
+        raise ValueError(
+            "ELEVENLABS_API_KEY is not configured. Set a valid key in .env to clone a voice."
+        )
+
+    from elevenlabs.client import ElevenLabs
+
+    client = ElevenLabs(api_key=settings.elevenlabs_api_key)
+
+    voice = client.clone(
+        name=f"Clone-{name}-{pres_id[:6]}",
+        files=[str(audio_path)],
+        description="Cloned voice for presentation training",
+    )
+
+    cloned_voices[pres_id] = voice.voice_id
+    print(f"[INFO] Voice cloned: {voice.voice_id} for pres={pres_id}")
+    return voice.voice_id
+
+
+def get_cloned_voice_id(pres_id: str) -> str | None:
+    """Get the cloned voice ID for a presentation, if any."""
+    return cloned_voices.get(pres_id)
 
 
 async def generate_reference_audio(
@@ -45,7 +79,12 @@ async def generate_reference_audio(
 
     client = ElevenLabs(api_key=settings.elevenlabs_api_key)
 
-    voice_id = DEFAULT_VOICES.get(persona, DEFAULT_VOICES["professional"])
+    if persona == "clone":
+        voice_id = cloned_voices.get(pres_id)
+        if not voice_id:
+            raise ValueError("No cloned voice found. Please upload a voice sample first.")
+    else:
+        voice_id = DEFAULT_VOICES.get(persona, DEFAULT_VOICES["professional"])
     preset = VOICE_PRESETS.get(persona, VOICE_PRESETS["professional"])
 
     audio_iter = client.text_to_speech.convert(
