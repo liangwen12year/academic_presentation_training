@@ -469,6 +469,10 @@ const App = {
       document.getElementById('btn-submit-recording').disabled = true;
 
       this.updateAvatarState('listening');
+      // Reset audience engagement for this recording session
+      if (this.state.audienceMode && Audience.canvas) {
+        Audience.overallEngagement = 0.2;
+      }
       this.startRealtimeCoach(analyser);
       this.drawWaveform();
     } catch (err) {
@@ -513,9 +517,9 @@ const App = {
     RealtimeCoach.onPauseTooLong = () => {
       if (Avatar.canvas) Avatar.briefReaction('pause_warning', 2000);
       this.addRealtimeAlert('Long pause detected — keep going!', 'warning');
-      // Audience loses some attention during pauses
+      // Audience loses attention during pauses
       if (this.state.audienceMode && Audience.canvas) {
-        Audience.setEngagement(Math.max(0.2, Audience.overallEngagement - 0.1));
+        Audience.setSpeakerEnergy(0);
       }
     };
 
@@ -536,15 +540,6 @@ const App = {
           indicator.className = 'rt-pace good';
         }
       }
-
-      // Audience engagement reacts to pace
-      if (this.state.audienceMode && Audience.canvas) {
-        if (pace === 'good') {
-          Audience.setEngagement(Math.min(1, Audience.overallEngagement + 0.02));
-        } else {
-          Audience.setEngagement(Math.max(0.2, Audience.overallEngagement - 0.02));
-        }
-      }
     };
 
     RealtimeCoach.onFillerDetected = (word) => {
@@ -560,19 +555,15 @@ const App = {
 
       // Feed energy to avatar mouth when in listening state (subtle reactivity)
       if (Avatar.canvas && Avatar.state === 'listening') {
-        Avatar.setAmplitude(level * 0.3); // subtle mouth movement mirroring speaker
+        Avatar.setAmplitude(level * 0.3);
       }
 
-      // Audience engagement correlates with speaker energy
+      // Feed speaker energy to audience — engagement is driven continuously in audience.update()
       if (this.state.audienceMode && Audience.canvas) {
         Audience.setSpeakerEnergy(level);
-        // Sustained good energy boosts engagement
-        if (level > 0.3) {
-          Audience.setEngagement(Math.min(1, Audience.overallEngagement + 0.001));
-          // Random audience nods when energy is good
-          if (Math.random() < 0.003) {
-            Audience.triggerNod();
-          }
+        // Random audience nods when energy is good
+        if (level > 0.3 && Math.random() < 0.005) {
+          Audience.triggerNod();
         }
       }
     };
@@ -584,6 +575,9 @@ const App = {
     if (!this.state.realtimeCoachActive) return;
     this.state.realtimeCoachActive = false;
     RealtimeCoach.stop();
+    if (this.state.audienceMode && Audience.canvas) {
+      Audience.stopListening();
+    }
   },
 
   addRealtimeAlert(message, type) {

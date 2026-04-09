@@ -14,8 +14,9 @@ const Audience = {
   w: 0,
   h: 0,
   members: [],
-  overallEngagement: 0.7,
-  speakerEnergy: 0.5,
+  overallEngagement: 0.5,
+  speakerEnergy: 0,
+  isListening: false,
 
   // Celebration state
   confetti: [],
@@ -97,6 +98,12 @@ const Audience = {
 
   setSpeakerEnergy(energy) {
     this.speakerEnergy = energy;
+    this.isListening = true;
+  },
+
+  stopListening() {
+    this.isListening = false;
+    this.speakerEnergy = 0;
   },
 
   triggerNod(memberIndex) {
@@ -150,7 +157,24 @@ const Audience = {
   },
 
   update(dt) {
+    // Drive engagement from speaker energy
+    if (this.isListening) {
+      // Map energy to engagement target: silent→0.1, loud→1.0
+      const target = 0.1 + this.speakerEnergy * 0.9;
+      // Rise at 3x/sec, drop at 5x/sec so silence is punishing
+      const rate = target > this.overallEngagement ? 3.0 : 5.0;
+      this.overallEngagement += (target - this.overallEngagement) * dt * rate;
+    } else {
+      // Not recording — slowly decay toward idle baseline
+      this.overallEngagement += (0.5 - this.overallEngagement) * dt * 0.5;
+    }
+    this.overallEngagement = Math.max(0, Math.min(1, this.overallEngagement));
+
     for (const m of this.members) {
+      // Sync member attention toward overall engagement
+      const personalTarget = Math.max(0.1, Math.min(1, this.overallEngagement + (Math.random() - 0.5) * 0.05));
+      m.targetAttention += (personalTarget - m.targetAttention) * dt * 2;
+
       // Breathing
       m.breathPhase += dt * 0.7;
       m.bodyOffsetY = Math.sin(m.breathPhase * Math.PI * 2) * 1.5;
