@@ -3,6 +3,8 @@
  *
  * States: idle, listening, thinking, speaking, encouraging, concerned,
  *         pause_warning, pace_warning, filler_warning, celebrating, demonstrating
+ *
+ * Enhanced with arms/gestures, glow effects, bigger expressions, energy reactivity.
  */
 
 const Avatar = {
@@ -19,12 +21,21 @@ const Avatar = {
     eyeOpenness: 1.0,
     pupilX: 0,
     pupilY: 0,
+    pupilSize: 1.0,        // dilate for excitement
     mouthOpenness: 0,
-    mouthCurve: 0.15,    // -1 frown ... +1 smile
+    mouthCurve: 0.15,      // -1 frown ... +1 smile
     bodyOffsetY: 0,
     headTilt: 0,
     eyebrowRaise: 0,
-    blush: 0,             // 0-1 for encouraging state
+    blush: 0,
+    glow: 0,               // 0-1 halo glow intensity
+    glowColor: '#818cf8',
+    leftArmAngle: 0,       // radians from resting position
+    rightArmAngle: 0,
+    leftHandWave: 0,       // for wave gesture
+    rightHandWave: 0,
+    bodyScale: 1.0,        // for bounce/shrink effects
+    headBob: 0,            // extra vertical head movement
   },
 
   // Target values set by state
@@ -40,12 +51,13 @@ const Avatar = {
   thinkDots: 0,
   nodTimer: 0,
   nodCount: 0,
+  idleSway: 0,
+  energyLevel: 0,         // fed from mic amplitude
 
   state: 'idle',
-  prevState: 'idle',     // for returning after brief reactions
-  reactionTimeout: null, // auto-revert timer for brief states
+  prevState: 'idle',
+  reactionTimeout: null,
 
-  // Color palette (matches app theme)
   colors: {
     skin: '#d4b8e0',
     skinShadow: '#c0a0d0',
@@ -70,7 +82,6 @@ const Avatar = {
     this.resetTargets();
     this.lastTime = performance.now();
     this.animate();
-
     window.addEventListener('resize', () => this.resize());
   },
 
@@ -91,8 +102,6 @@ const Avatar = {
   setState(newState) {
     this.state = newState;
     this.resetTargets();
-
-    // State-specific init
     if (newState === 'encouraging') {
       this.nodTimer = 0;
       this.nodCount = 0;
@@ -105,6 +114,17 @@ const Avatar = {
   resetTargets() {
     const s = this.state;
     const t = this.targets;
+
+    // Defaults
+    t.leftArmAngle = 0;
+    t.rightArmAngle = 0;
+    t.leftHandWave = 0;
+    t.rightHandWave = 0;
+    t.bodyScale = 1.0;
+    t.glow = 0;
+    t.glowColor = '#818cf8';
+    t.pupilSize = 1.0;
+    t.headBob = 0;
 
     switch (s) {
       case 'idle':
@@ -119,118 +139,161 @@ const Avatar = {
         break;
 
       case 'listening':
-        t.eyeOpenness = 1.1;
+        t.eyeOpenness = 1.2;
         t.pupilX = 0;
-        t.pupilY = -0.1;
+        t.pupilY = -0.15;
+        t.pupilSize = 1.15;
         t.mouthOpenness = 0;
-        t.mouthCurve = 0.1;
-        t.headTilt = 0.04;
-        t.eyebrowRaise = 0.3;
+        t.mouthCurve = 0.15;
+        t.headTilt = 0.06;
+        t.eyebrowRaise = 0.4;
         t.blush = 0;
+        t.glow = 0.3;
+        t.glowColor = '#818cf8';
+        // Cup hand to ear gesture
+        t.rightArmAngle = -0.8;
+        t.rightHandWave = 0.3;
         break;
 
       case 'thinking':
-        t.eyeOpenness = 0.85;
-        t.pupilX = 0.3;
-        t.pupilY = -0.35;
+        t.eyeOpenness = 0.75;
+        t.pupilX = 0.4;
+        t.pupilY = -0.4;
         t.mouthOpenness = 0.08;
         t.mouthCurve = 0;
-        t.headTilt = -0.03;
-        t.eyebrowRaise = 0.15;
+        t.headTilt = -0.05;
+        t.eyebrowRaise = 0.2;
         t.blush = 0;
+        // Chin-rest gesture
+        t.rightArmAngle = -1.0;
+        t.rightHandWave = 0.5;
         break;
 
       case 'speaking':
-        t.eyeOpenness = 0.95;
+        t.eyeOpenness = 1.0;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.mouthCurve = 0.1;
+        t.mouthCurve = 0.12;
         t.headTilt = 0;
-        t.eyebrowRaise = 0.05;
+        t.eyebrowRaise = 0.1;
         t.blush = 0;
-        // mouthOpenness is driven dynamically
+        t.glow = 0.2;
+        // Gesturing hand
+        t.rightArmAngle = -0.5;
         break;
 
       case 'encouraging':
-        t.eyeOpenness = 0.8;
+        t.eyeOpenness = 0.75;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.mouthOpenness = 0.1;
-        t.mouthCurve = 0.9;
-        t.headTilt = 0;
-        t.eyebrowRaise = 0.2;
-        t.blush = 0.7;
-        break;
-
-      case 'concerned':
-        t.eyeOpenness = 1.05;
-        t.pupilX = 0;
-        t.pupilY = 0.05;
-        t.mouthOpenness = 0.05;
-        t.mouthCurve = -0.3;
-        t.headTilt = -0.04;
-        t.eyebrowRaise = 0.5;
-        t.blush = 0;
-        break;
-
-      case 'pause_warning':
-        t.eyeOpenness = 1.15;
-        t.pupilX = 0;
-        t.pupilY = 0;
-        t.mouthOpenness = 0.1;
-        t.mouthCurve = -0.1;
-        t.headTilt = 0.06;
-        t.eyebrowRaise = 0.6;
-        t.blush = 0;
-        break;
-
-      case 'pace_warning':
-        t.eyeOpenness = 0.9;
-        t.pupilX = 0;
-        t.pupilY = 0;
-        t.mouthOpenness = 0.02;
-        t.mouthCurve = -0.15;
-        t.headTilt = -0.03;
-        t.eyebrowRaise = 0.35;
-        t.blush = 0;
-        break;
-
-      case 'filler_warning':
-        t.eyeOpenness = 1.05;
-        t.pupilX = 0.15;
-        t.pupilY = -0.1;
-        t.mouthOpenness = 0;
-        t.mouthCurve = 0;
-        t.headTilt = 0;
-        t.eyebrowRaise = 0.7;
-        t.blush = 0;
-        break;
-
-      case 'celebrating':
-        t.eyeOpenness = 0.7;
-        t.pupilX = 0;
-        t.pupilY = 0;
-        t.mouthOpenness = 0.25;
+        t.pupilSize = 1.2;
+        t.mouthOpenness = 0.15;
         t.mouthCurve = 1.0;
         t.headTilt = 0;
         t.eyebrowRaise = 0.3;
-        t.blush = 0.9;
+        t.blush = 0.8;
+        t.bodyScale = 1.05;
+        t.glow = 0.6;
+        t.glowColor = '#10b981';
+        // Thumbs up gesture
+        t.rightArmAngle = -1.2;
+        t.rightHandWave = 0.8;
+        break;
+
+      case 'concerned':
+        t.eyeOpenness = 1.1;
+        t.pupilX = 0;
+        t.pupilY = 0.08;
+        t.pupilSize = 1.1;
+        t.mouthOpenness = 0.06;
+        t.mouthCurve = -0.5;
+        t.headTilt = -0.06;
+        t.eyebrowRaise = 0.7;
+        t.blush = 0;
+        t.bodyScale = 0.97;
+        t.glow = 0.3;
+        t.glowColor = '#f59e0b';
+        break;
+
+      case 'pause_warning':
+        t.eyeOpenness = 1.3;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.pupilSize = 1.2;
+        t.mouthOpenness = 0.12;
+        t.mouthCurve = -0.15;
+        t.headTilt = 0.08;
+        t.eyebrowRaise = 0.8;
+        t.blush = 0;
+        t.glow = 0.5;
+        t.glowColor = '#f59e0b';
+        // Waving hand
+        t.rightArmAngle = -1.4;
+        t.rightHandWave = 1.0;
+        break;
+
+      case 'pace_warning':
+        t.eyeOpenness = 0.85;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.mouthOpenness = 0.03;
+        t.mouthCurve = -0.25;
+        t.headTilt = -0.04;
+        t.eyebrowRaise = 0.5;
+        t.blush = 0;
+        t.glow = 0.3;
+        t.glowColor = '#ef4444';
+        // "Slow down" palm-out gesture
+        t.leftArmAngle = -0.6;
+        t.leftHandWave = 0.5;
+        break;
+
+      case 'filler_warning':
+        t.eyeOpenness = 1.15;
+        t.pupilX = 0.2;
+        t.pupilY = -0.15;
+        t.mouthOpenness = 0;
+        t.mouthCurve = 0;
+        t.headTilt = 0;
+        t.eyebrowRaise = 0.9;
+        t.blush = 0;
+        t.glow = 0.25;
+        t.glowColor = '#f59e0b';
+        break;
+
+      case 'celebrating':
+        t.eyeOpenness = 0.65;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.pupilSize = 1.3;
+        t.mouthOpenness = 0.3;
+        t.mouthCurve = 1.0;
+        t.headTilt = 0;
+        t.eyebrowRaise = 0.4;
+        t.blush = 1.0;
+        t.bodyScale = 1.08;
+        t.glow = 0.9;
+        t.glowColor = '#f59e0b';
+        // Both arms up
+        t.leftArmAngle = -1.5;
+        t.rightArmAngle = -1.5;
+        t.leftHandWave = 1.0;
+        t.rightHandWave = 1.0;
         break;
 
       case 'demonstrating':
-        t.eyeOpenness = 0.95;
+        t.eyeOpenness = 1.0;
         t.pupilX = 0;
         t.pupilY = 0.1;
         t.mouthCurve = 0.05;
         t.headTilt = 0;
         t.eyebrowRaise = 0;
         t.blush = 0;
-        // mouthOpenness is driven by setAmplitude
+        t.glow = 0.15;
         break;
     }
   },
 
-  // Brief reaction: show state momentarily then revert
   briefReaction(state, durationMs) {
     if (this.reactionTimeout) clearTimeout(this.reactionTimeout);
     this.prevState = this.state;
@@ -247,10 +310,8 @@ const Avatar = {
     const now = performance.now();
     const dt = Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
-
     this.update(dt);
     this.draw();
-
     this.animId = requestAnimationFrame(() => this.animate());
   },
 
@@ -261,11 +322,17 @@ const Avatar = {
   update(dt) {
     const p = this.params;
     const t = this.targets;
-    const lerpSpeed = 5;
+    const lerpSpeed = 6;
 
-    // Breathing (all states)
+    // Breathing
     this.breathPhase += dt * 0.8;
-    p.bodyOffsetY = Math.sin(this.breathPhase * Math.PI * 2) * 2;
+    p.bodyOffsetY = Math.sin(this.breathPhase * Math.PI * 2) * 3;
+
+    // Idle sway
+    this.idleSway += dt * 0.3;
+    if (this.state === 'idle') {
+      p.headTilt = Math.sin(this.idleSway * Math.PI * 2) * 0.02;
+    }
 
     // Blinking
     this.blinkTimer += dt;
@@ -282,56 +349,83 @@ const Avatar = {
         this.blinkProgress = 0;
       }
     }
-
     const blinkFactor = this.isBlinking
-      ? (this.blinkProgress < 0.5
-        ? 1 - this.blinkProgress * 2
-        : (this.blinkProgress - 0.5) * 2)
+      ? (this.blinkProgress < 0.5 ? 1 - this.blinkProgress * 2 : (this.blinkProgress - 0.5) * 2)
       : 1;
 
     p.eyeOpenness = this.lerp(p.eyeOpenness, t.eyeOpenness * blinkFactor, lerpSpeed, dt);
 
-    // Speaking mouth animation
+    // Speaking mouth — more varied and energetic
     if (this.state === 'speaking') {
-      this.speakPhase += dt * 10;
-      const speakAmp = 0.15 + Math.sin(this.speakPhase * 2.3) * 0.1
-        + Math.sin(this.speakPhase * 5.7) * 0.08
-        + Math.sin(this.speakPhase * 1.1) * 0.05;
-      t.mouthOpenness = Math.max(0.05, Math.min(0.45, speakAmp));
+      this.speakPhase += dt * 12;
+      const speakAmp = 0.18 + Math.sin(this.speakPhase * 2.3) * 0.12
+        + Math.sin(this.speakPhase * 5.7) * 0.1
+        + Math.sin(this.speakPhase * 0.7) * 0.06;
+      t.mouthOpenness = Math.max(0.05, Math.min(0.5, speakAmp));
     }
 
-    // Nod for encouraging
-    if (this.state === 'encouraging' && this.nodCount < 3) {
+    // Nod for encouraging — more vigorous
+    if (this.state === 'encouraging' && this.nodCount < 4) {
       this.nodTimer += dt;
-      if (this.nodTimer < 0.3) {
-        p.bodyOffsetY -= 4 * dt * 10;
-      } else if (this.nodTimer < 0.6) {
-        p.bodyOffsetY += 4 * dt * 10;
+      if (this.nodTimer < 0.2) {
+        p.headBob = -6;
+      } else if (this.nodTimer < 0.4) {
+        p.headBob = 6;
       } else {
         this.nodTimer = 0;
         this.nodCount++;
+        p.headBob = 0;
       }
+    } else {
+      p.headBob = this.lerp(p.headBob, t.headBob, 5, dt);
+    }
+
+    // Celebrating — bouncy body and waving arms
+    if (this.state === 'celebrating') {
+      const bounce = Math.sin(performance.now() / 150) * 5;
+      p.bodyOffsetY += bounce;
+      t.leftArmAngle = -1.5 + Math.sin(performance.now() / 200) * 0.3;
+      t.rightArmAngle = -1.5 + Math.sin(performance.now() / 200 + 1) * 0.3;
+    }
+
+    // Pause warning — waving hand
+    if (this.state === 'pause_warning') {
+      t.rightHandWave = 0.5 + Math.sin(performance.now() / 150) * 0.5;
+    }
+
+    // Listening — pupils track with subtle energy reactivity
+    if (this.state === 'listening') {
+      t.pupilX = Math.sin(performance.now() / 2000) * 0.1;
+      t.pupilY = -0.15 + Math.cos(performance.now() / 3000) * 0.05;
+      // Body reacts to energy — subtle lean-in
+      t.headTilt = 0.06 + this.energyLevel * 0.04;
+      t.bodyScale = 1.0 + this.energyLevel * 0.03;
     }
 
     // Thinking dots
     if (this.state === 'thinking') {
-      this.thinkDots += dt * 2;
-    }
-
-    // Listening: subtle pupil drift
-    if (this.state === 'listening') {
-      t.pupilX = Math.sin(performance.now() / 2000) * 0.08;
-      t.pupilY = -0.1 + Math.cos(performance.now() / 3000) * 0.05;
+      this.thinkDots += dt * 2.5;
     }
 
     // Interpolate all params
     p.pupilX = this.lerp(p.pupilX, t.pupilX, lerpSpeed, dt);
     p.pupilY = this.lerp(p.pupilY, t.pupilY, lerpSpeed, dt);
+    p.pupilSize = this.lerp(p.pupilSize, t.pupilSize, lerpSpeed * 0.8, dt);
     p.mouthOpenness = this.lerp(p.mouthOpenness, t.mouthOpenness, lerpSpeed * 1.5, dt);
     p.mouthCurve = this.lerp(p.mouthCurve, t.mouthCurve, lerpSpeed * 0.8, dt);
-    p.headTilt = this.lerp(p.headTilt, t.headTilt, lerpSpeed * 0.5, dt);
+    if (this.state !== 'idle') {
+      p.headTilt = this.lerp(p.headTilt, t.headTilt, lerpSpeed * 0.5, dt);
+    }
     p.eyebrowRaise = this.lerp(p.eyebrowRaise, t.eyebrowRaise, lerpSpeed, dt);
     p.blush = this.lerp(p.blush, t.blush, lerpSpeed * 0.5, dt);
+    p.glow = this.lerp(p.glow, t.glow, lerpSpeed * 0.4, dt);
+    p.leftArmAngle = this.lerp(p.leftArmAngle, t.leftArmAngle, lerpSpeed * 0.6, dt);
+    p.rightArmAngle = this.lerp(p.rightArmAngle, t.rightArmAngle, lerpSpeed * 0.6, dt);
+    p.leftHandWave = this.lerp(p.leftHandWave, t.leftHandWave, lerpSpeed * 0.8, dt);
+    p.rightHandWave = this.lerp(p.rightHandWave, t.rightHandWave, lerpSpeed * 0.8, dt);
+    p.bodyScale = this.lerp(p.bodyScale, t.bodyScale, lerpSpeed * 0.5, dt);
+
+    if (typeof t.glowColor === 'string') p.glowColor = t.glowColor;
   },
 
   // ── Drawing ───────────────────────────────────────────────────
@@ -341,22 +435,36 @@ const Avatar = {
     const cx = this.w / 2;
     const cy = this.h * 0.42;
     const p = this.params;
-    const scale = Math.min(this.w / 380, this.h / 300);
+    const scale = Math.min(this.w / 380, this.h / 340);
 
     ctx.clearRect(0, 0, this.w, this.h);
 
-    // Background
+    // Background gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 0, this.h);
     bgGrad.addColorStop(0, '#1e1b4b');
     bgGrad.addColorStop(1, '#312e81');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, this.w, this.h);
 
-    ctx.save();
-    ctx.translate(cx, cy + p.bodyOffsetY);
-    ctx.rotate(p.headTilt);
-    ctx.scale(scale, scale);
+    // Glow effect behind avatar
+    if (p.glow > 0.01) {
+      ctx.save();
+      const glowRadius = 90 * scale * (1 + p.glow * 0.5);
+      const glowGrad = ctx.createRadialGradient(cx, cy + p.bodyOffsetY, 0, cx, cy + p.bodyOffsetY, glowRadius);
+      glowGrad.addColorStop(0, this.hexToRgba(p.glowColor, p.glow * 0.35));
+      glowGrad.addColorStop(0.5, this.hexToRgba(p.glowColor, p.glow * 0.12));
+      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glowGrad;
+      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.restore();
+    }
 
+    ctx.save();
+    ctx.translate(cx, cy + p.bodyOffsetY + p.headBob);
+    ctx.rotate(p.headTilt);
+    ctx.scale(scale * p.bodyScale, scale * p.bodyScale);
+
+    this.drawArms(ctx, p);
     this.drawBody(ctx);
     this.drawNeck(ctx);
     this.drawHead(ctx, p);
@@ -372,18 +480,77 @@ const Avatar = {
 
     // Thinking dots
     if (this.state === 'thinking') {
-      this.drawThinkDots(ctx, cx, cy * 0.25);
+      this.drawThinkDots(ctx, cx, cy * 0.2);
+    }
+
+    // Celebrating particles
+    if (this.state === 'celebrating') {
+      this.drawCelebrationParticles(ctx, cx, cy);
     }
 
     // State label
     this.drawStateLabel(ctx);
   },
 
+  hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  },
+
+  drawArms(ctx, p) {
+    for (const side of [-1, 1]) {
+      const armAngle = side === -1 ? p.leftArmAngle : p.rightArmAngle;
+      const handWave = side === -1 ? p.leftHandWave : p.rightHandWave;
+
+      if (Math.abs(armAngle) < 0.01 && Math.abs(handWave) < 0.01) continue;
+
+      ctx.save();
+      const shoulderX = side * 60;
+      const shoulderY = 85;
+      ctx.translate(shoulderX, shoulderY);
+      ctx.rotate(armAngle * side);
+
+      // Upper arm
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(side * 10, 50);
+      ctx.strokeStyle = this.colors.body;
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Forearm
+      ctx.save();
+      ctx.translate(side * 10, 50);
+      ctx.rotate(handWave * side * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(side * 5, 40);
+      ctx.strokeStyle = this.colors.bodyHighlight;
+      ctx.lineWidth = 12;
+      ctx.stroke();
+
+      // Hand
+      ctx.beginPath();
+      ctx.arc(side * 5, 44, 8, 0, Math.PI * 2);
+      ctx.fillStyle = this.colors.skin;
+      ctx.fill();
+      ctx.strokeStyle = this.colors.skinShadow;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.restore();
+    }
+  },
+
   drawBody(ctx) {
     ctx.save();
     ctx.translate(0, 68);
 
-    // Shoulders/body
+    // Body
     ctx.beginPath();
     ctx.ellipse(0, 40, 75, 50, 0, Math.PI, 0, true);
     const bodyGrad = ctx.createLinearGradient(-60, 0, 60, 80);
@@ -392,7 +559,7 @@ const Avatar = {
     ctx.fillStyle = bodyGrad;
     ctx.fill();
 
-    // Collar detail
+    // Collar
     ctx.beginPath();
     ctx.moveTo(-20, 0);
     ctx.quadraticCurveTo(0, 15, 20, 0);
@@ -411,7 +578,6 @@ const Avatar = {
   },
 
   drawHead(ctx, p) {
-    // Head shape — slightly oval
     ctx.beginPath();
     ctx.ellipse(0, 0, 56, 62, 0, 0, Math.PI * 2);
     const headGrad = ctx.createRadialGradient(-10, -10, 10, 0, 0, 62);
@@ -419,8 +585,6 @@ const Avatar = {
     headGrad.addColorStop(1, this.colors.skin);
     ctx.fillStyle = headGrad;
     ctx.fill();
-
-    // Subtle outline
     ctx.strokeStyle = this.colors.skinShadow;
     ctx.lineWidth = 1.5;
     ctx.stroke();
@@ -437,7 +601,6 @@ const Avatar = {
       ctx.strokeStyle = this.colors.skinShadow;
       ctx.lineWidth = 1;
       ctx.stroke();
-      // Inner ear
       ctx.beginPath();
       ctx.ellipse(side * 2, 0, 5, 8, 0, 0, Math.PI * 2);
       ctx.fillStyle = this.colors.skinShadow;
@@ -449,13 +612,11 @@ const Avatar = {
   drawHair(ctx) {
     ctx.save();
     ctx.beginPath();
-
-    // Top hair arc
     ctx.ellipse(0, -20, 62, 50, 0, Math.PI, 0, true);
     ctx.fillStyle = this.colors.hair;
     ctx.fill();
 
-    // Side hair strands
+    // Side hair
     ctx.beginPath();
     ctx.moveTo(-58, -10);
     ctx.quadraticCurveTo(-65, 10, -55, 25);
@@ -481,7 +642,6 @@ const Avatar = {
     ctx.ellipse(0, -20, 60, 45, 0, 0, Math.PI, true);
     ctx.fillStyle = this.colors.hair;
     ctx.fill();
-
     ctx.restore();
   },
 
@@ -492,7 +652,6 @@ const Avatar = {
     for (const side of [-1, 1]) {
       const ex = side * eyeSpacing;
 
-      // Eye white
       ctx.save();
       ctx.beginPath();
       const openH = 12 * Math.max(0.05, p.eyeOpenness);
@@ -504,27 +663,35 @@ const Avatar = {
       ctx.stroke();
       ctx.clip();
 
-      // Iris
+      // Iris — size responds to state
       const irisX = ex + p.pupilX * 8;
       const irisY = eyeY + p.pupilY * 6;
+      const irisR = 7 * p.pupilSize;
       ctx.beginPath();
-      ctx.arc(irisX, irisY, 7, 0, Math.PI * 2);
-      const irisGrad = ctx.createRadialGradient(irisX - 1, irisY - 1, 1, irisX, irisY, 7);
+      ctx.arc(irisX, irisY, irisR, 0, Math.PI * 2);
+      const irisGrad = ctx.createRadialGradient(irisX - 1, irisY - 1, 1, irisX, irisY, irisR);
       irisGrad.addColorStop(0, '#818cf8');
       irisGrad.addColorStop(1, this.colors.iris);
       ctx.fillStyle = irisGrad;
       ctx.fill();
 
       // Pupil
+      const pupilR = 3.5 * p.pupilSize;
       ctx.beginPath();
-      ctx.arc(irisX, irisY, 3.5, 0, Math.PI * 2);
+      ctx.arc(irisX, irisY, pupilR, 0, Math.PI * 2);
       ctx.fillStyle = this.colors.pupil;
       ctx.fill();
 
       // Highlight
       ctx.beginPath();
-      ctx.arc(irisX + 2, irisY - 2, 1.8, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.arc(irisX + 2, irisY - 2, 2, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fill();
+
+      // Second smaller highlight
+      ctx.beginPath();
+      ctx.arc(irisX - 1.5, irisY + 1.5, 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
       ctx.fill();
 
       ctx.restore();
@@ -534,7 +701,7 @@ const Avatar = {
   drawEyebrows(ctx, p) {
     const eyeY = -8;
     const eyeSpacing = 22;
-    const browRaise = p.eyebrowRaise * 8;
+    const browRaise = p.eyebrowRaise * 10;
 
     for (const side of [-1, 1]) {
       const bx = side * eyeSpacing;
@@ -543,16 +710,13 @@ const Avatar = {
 
       const startX = bx - side * 14;
       const endX = bx + side * 14;
-      const midY = eyeY - 18 - browRaise;
-      // Inner brow raises more for concerned
-      const innerY = this.state === 'concerned'
-        ? midY - 4 * (side === -1 ? 1 : 1)
-        : midY;
+      const midY = eyeY - 20 - browRaise;
+      const innerY = this.state === 'concerned' ? midY - 5 : midY;
 
       ctx.moveTo(startX, innerY + 2);
-      ctx.quadraticCurveTo(bx, midY - 2, endX, midY + 3);
+      ctx.quadraticCurveTo(bx, midY - 3, endX, midY + 3);
       ctx.strokeStyle = this.colors.hair;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.stroke();
       ctx.restore();
@@ -571,7 +735,7 @@ const Avatar = {
 
   drawMouth(ctx, p) {
     const my = 28;
-    const mouthWidth = 18;
+    const mouthWidth = 20;
     const openness = p.mouthOpenness;
     const curve = p.mouthCurve;
 
@@ -579,15 +743,12 @@ const Avatar = {
     ctx.translate(0, my);
 
     if (openness > 0.03) {
-      // Open mouth
       ctx.beginPath();
-      const openH = openness * 20;
+      const openH = openness * 22;
 
-      // Upper lip
       ctx.moveTo(-mouthWidth, 0);
-      ctx.quadraticCurveTo(0, -curve * 6, mouthWidth, 0);
-      // Lower lip
-      ctx.quadraticCurveTo(0, openH + curve * 4, -mouthWidth, 0);
+      ctx.quadraticCurveTo(0, -curve * 8, mouthWidth, 0);
+      ctx.quadraticCurveTo(0, openH + curve * 5, -mouthWidth, 0);
 
       ctx.fillStyle = this.colors.mouthFill;
       ctx.fill();
@@ -595,20 +756,19 @@ const Avatar = {
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      // Teeth hint when mouth is wide
-      if (openness > 0.15) {
+      // Teeth
+      if (openness > 0.12) {
         ctx.beginPath();
-        ctx.rect(-10, -1, 20, Math.min(openH * 0.4, 6));
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.rect(-11, -1, 22, Math.min(openH * 0.4, 7));
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
         ctx.fill();
       }
     } else {
-      // Closed mouth — just a curve
       ctx.beginPath();
       ctx.moveTo(-mouthWidth, 0);
-      ctx.quadraticCurveTo(0, curve * 12, mouthWidth, 0);
+      ctx.quadraticCurveTo(0, curve * 14, mouthWidth, 0);
       ctx.strokeStyle = this.colors.mouthLine;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
       ctx.stroke();
     }
@@ -618,10 +778,10 @@ const Avatar = {
 
   drawBlush(ctx, p) {
     if (p.blush < 0.01) return;
-    const alpha = p.blush * 0.35;
+    const alpha = p.blush * 0.45;
     for (const side of [-1, 1]) {
       ctx.beginPath();
-      ctx.ellipse(side * 38, 12, 12, 7, 0, 0, Math.PI * 2);
+      ctx.ellipse(side * 38, 12, 14, 8, 0, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(232, 160, 176, ${alpha})`;
       ctx.fill();
     }
@@ -632,15 +792,43 @@ const Avatar = {
     const phase = this.thinkDots;
 
     for (let i = 0; i < dotCount; i++) {
-      const bounce = Math.sin((phase - i * 0.4) * Math.PI) * 8;
+      const bounce = Math.sin((phase - i * 0.4) * Math.PI) * 10;
       const alpha = (Math.sin((phase - i * 0.4) * Math.PI) + 1) / 2;
       const dx = cx - 20 + i * 20;
       const dy = y - Math.max(0, bounce);
 
       ctx.beginPath();
-      ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+      ctx.arc(dx, dy, 6, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(165, 180, 252, ${0.3 + alpha * 0.7})`;
       ctx.fill();
+
+      // Glow around dots
+      ctx.beginPath();
+      ctx.arc(dx, dy, 10, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(165, 180, 252, ${alpha * 0.15})`;
+      ctx.fill();
+    }
+  },
+
+  drawCelebrationParticles(ctx, cx, cy) {
+    const now = performance.now();
+    const colors = ['#ef4444', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#8b5cf6'];
+
+    for (let i = 0; i < 20; i++) {
+      const seed = i * 137.5;
+      const age = ((now / 1000 + seed) % 3) / 3; // 0-1 cycle
+      const x = cx + Math.sin(seed) * 120 * age;
+      const y = cy - 60 - age * 180 + Math.sin(seed * 2) * 30;
+      const alpha = 1 - age;
+      const size = (3 + (seed % 4)) * (1 - age * 0.5);
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(now / 500 + seed);
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.fillRect(-size / 2, -size / 4, size, size / 2);
+      ctx.restore();
     }
   },
 
@@ -651,9 +839,9 @@ const Avatar = {
       thinking: 'Analyzing...',
       speaking: 'Speaking...',
       encouraging: 'Great job!',
-      concerned: 'Let\'s try again',
+      concerned: "Let's try again",
       pause_warning: 'Keep going!',
-      pace_warning: 'Watch your pace',
+      pace_warning: 'Slow down!',
       filler_warning: 'Filler detected',
       celebrating: 'New personal best!',
       demonstrating: 'Listen carefully...',
@@ -661,17 +849,34 @@ const Avatar = {
     const label = labels[this.state];
     if (!label) return;
 
+    // Label with background pill
     ctx.save();
-    ctx.font = '600 13px Inter, sans-serif';
+    ctx.font = '600 14px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(165, 180, 252, 0.8)';
-    ctx.fillText(label, this.w / 2, this.h - 12);
+    const metrics = ctx.measureText(label);
+    const lx = this.w / 2;
+    const ly = this.h - 16;
+    const pw = metrics.width + 20;
+    const ph = 24;
+
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.25)';
+    ctx.beginPath();
+    ctx.roundRect(lx - pw / 2, ly - ph / 2 - 2, pw, ph, 12);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(165, 180, 252, 0.9)';
+    ctx.fillText(label, lx, ly + 4);
     ctx.restore();
   },
 
   setAmplitude(value) {
+    this.energyLevel = value;
     if (this.state === 'speaking') {
-      this.targets.mouthOpenness = 0.05 + value * 0.4;
+      this.targets.mouthOpenness = 0.05 + value * 0.45;
+    }
+    if (this.state === 'listening') {
+      // Mouth slightly mirrors the speaker's energy
+      this.targets.mouthOpenness = value * 0.08;
     }
   },
 };

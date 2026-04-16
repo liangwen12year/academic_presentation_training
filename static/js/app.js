@@ -16,7 +16,6 @@ const App = {
     stream: null,
     coachMode: localStorage.getItem('coachMode') || 'no-avatar',
     avatarReactionTimeout: null,
-    audienceMode: false,
     realtimeCoachActive: false,
   },
 
@@ -58,25 +57,16 @@ const App = {
 
   applyAvatarMode() {
     const avatarContainer = document.getElementById('avatar-container');
-    const audienceContainer = document.getElementById('audience-container');
 
     if (this.state.coachMode === 'avatar') {
       avatarContainer.classList.remove('hidden');
-      audienceContainer.classList.remove('hidden');
       if (!Avatar.canvas) {
         Avatar.init(document.getElementById('avatar-canvas'));
       }
-      if (!Audience.canvas) {
-        Audience.init(document.getElementById('audience-canvas'), 5);
-      }
       Avatar.setState('idle');
-      this.state.audienceMode = true;
     } else {
       avatarContainer.classList.add('hidden');
-      audienceContainer.classList.add('hidden');
       if (Avatar.animId) { Avatar.destroy(); Avatar.canvas = null; }
-      if (Audience.animId) { Audience.destroy(); Audience.canvas = null; }
-      this.state.audienceMode = false;
     }
   },
 
@@ -469,10 +459,6 @@ const App = {
       document.getElementById('btn-submit-recording').disabled = true;
 
       this.updateAvatarState('listening');
-      // Reset audience engagement for this recording session
-      if (this.state.audienceMode && Audience.canvas) {
-        Audience.overallEngagement = 0.2;
-      }
       this.startRealtimeCoach(analyser);
       this.drawWaveform();
     } catch (err) {
@@ -517,10 +503,6 @@ const App = {
     RealtimeCoach.onPauseTooLong = () => {
       if (Avatar.canvas) Avatar.briefReaction('pause_warning', 2000);
       this.addRealtimeAlert('Long pause detected — keep going!', 'warning');
-      // Audience loses attention during pauses
-      if (this.state.audienceMode && Audience.canvas) {
-        Audience.setSpeakerEnergy(0);
-      }
     };
 
     RealtimeCoach.onPaceChange = (pace) => {
@@ -553,18 +535,9 @@ const App = {
       const bar = document.getElementById('rt-energy-bar');
       if (bar) bar.style.width = `${level * 100}%`;
 
-      // Feed energy to avatar mouth when in listening state (subtle reactivity)
+      // Feed energy to avatar — mouth mirrors speaker, body reacts to energy
       if (Avatar.canvas && Avatar.state === 'listening') {
-        Avatar.setAmplitude(level * 0.3);
-      }
-
-      // Feed speaker energy to audience — engagement is driven continuously in audience.update()
-      if (this.state.audienceMode && Audience.canvas) {
-        Audience.setSpeakerEnergy(level);
-        // Random audience nods when energy is good
-        if (level > 0.3 && Math.random() < 0.005) {
-          Audience.triggerNod();
-        }
+        Avatar.setAmplitude(level);
       }
     };
 
@@ -575,9 +548,6 @@ const App = {
     if (!this.state.realtimeCoachActive) return;
     this.state.realtimeCoachActive = false;
     RealtimeCoach.stop();
-    if (this.state.audienceMode && Audience.canvas) {
-      Audience.stopListening();
-    }
   },
 
   addRealtimeAlert(message, type) {
@@ -688,9 +658,6 @@ const App = {
 
     if (isNewBest) {
       this.updateAvatarState('celebrating', 6000);
-      if (this.state.audienceMode && Audience.canvas) {
-        Audience.triggerConfetti();
-      }
     } else if (data.overall_score >= 70) {
       this.updateAvatarState('encouraging', 5000);
     } else {
