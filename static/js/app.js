@@ -14,7 +14,7 @@ const App = {
     analyzerNode: null,
     animFrameId: null,
     stream: null,
-    coachMode: localStorage.getItem('coachMode') || 'no-avatar',
+    coachMode: localStorage.getItem('coachMode') || 'avatar',
     avatarReactionTimeout: null,
     realtimeCoachActive: false,
   },
@@ -203,9 +203,10 @@ const App = {
     if (reviewCard) reviewCard.classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
 
-    // Hide realtime feedback
+    // Hide realtime feedback only if no analysis results are showing
+    const analysisVisible = !document.getElementById('analysis-results').classList.contains('hidden');
     const rtFeedback = document.getElementById('realtime-feedback');
-    if (rtFeedback) rtFeedback.classList.add('hidden');
+    if (rtFeedback && !analysisVisible) rtFeedback.classList.add('hidden');
 
     this.updateAvatarState('idle');
   },
@@ -701,10 +702,10 @@ const App = {
     // Pacing detail
     document.getElementById('pacing-detail').textContent = data.pacing.detail;
     const pacingBadge = document.getElementById('pacing-badge');
-    pacingBadge.textContent = data.pacing.assessment.replace('_', ' ');
+    pacingBadge.textContent = data.pacing.assessment.replace(/_/g, ' ');
     pacingBadge.className = 'filler-tag';
     if (data.pacing.assessment === 'good') pacingBadge.style.background = '#d1fae5';
-    else if (data.pacing.assessment === 'too_fast') pacingBadge.style.background = '#fee2e2';
+    else if (data.pacing.assessment === 'a_bit_fast') pacingBadge.style.background = '#fee2e2';
     else pacingBadge.style.background = '#fef3c7';
 
     // Filler words
@@ -752,6 +753,27 @@ const App = {
       })
       .join(' ');
 
+    // Sync real-time feedback panel with final analysis values
+    const rtPanel = document.getElementById('realtime-feedback');
+    if (rtPanel) {
+      rtPanel.classList.remove('hidden');
+      const indicator = document.getElementById('rt-pace-indicator');
+      if (indicator) {
+        if (data.pacing.assessment === 'good') {
+          indicator.textContent = 'Good';
+          indicator.className = 'rt-pace good';
+        } else if (data.pacing.assessment === 'a_bit_fast') {
+          indicator.textContent = 'A Bit Fast';
+          indicator.className = 'rt-pace danger';
+        } else {
+          indicator.textContent = 'A Bit Slow';
+          indicator.className = 'rt-pace warning';
+        }
+      }
+      const fillerCountEl = document.getElementById('rt-filler-count');
+      if (fillerCountEl) fillerCountEl.textContent = data.filler_count;
+    }
+
     container.scrollIntoView({ behavior: 'smooth' });
   },
 
@@ -763,9 +785,9 @@ const App = {
     // Build a comprehensive spoken summary
     let spoken = message + '. ';
 
-    if (data.pacing.assessment === 'too_fast') {
+    if (data.pacing.assessment === 'a_bit_fast') {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
-    } else if (data.pacing.assessment === 'too_slow') {
+    } else if (data.pacing.assessment === 'a_bit_slow') {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
     } else {
       spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;

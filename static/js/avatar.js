@@ -186,18 +186,18 @@ const Avatar = {
         t.eyeOpenness = 0.75;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.pupilSize = 1.2;
-        t.mouthOpenness = 0.15;
+        t.pupilSize = 1.3;
+        t.mouthOpenness = 0.2;
         t.mouthCurve = 1.0;
         t.headTilt = 0;
-        t.eyebrowRaise = 0.3;
-        t.blush = 0.8;
-        t.bodyScale = 1.05;
-        t.glow = 0.6;
+        t.eyebrowRaise = 0.4;
+        t.blush = 1.0;
+        t.bodyScale = 1.08;
+        t.glow = 0.8;
         t.glowColor = '#10b981';
         // Thumbs up gesture
-        t.rightArmAngle = -1.2;
-        t.rightHandWave = 0.8;
+        t.rightArmAngle = -1.4;
+        t.rightHandWave = 1.0;
         break;
 
       case 'concerned':
@@ -265,18 +265,18 @@ const Avatar = {
         t.eyeOpenness = 0.65;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.pupilSize = 1.3;
-        t.mouthOpenness = 0.3;
+        t.pupilSize = 1.4;
+        t.mouthOpenness = 0.35;
         t.mouthCurve = 1.0;
         t.headTilt = 0;
-        t.eyebrowRaise = 0.4;
+        t.eyebrowRaise = 0.5;
         t.blush = 1.0;
-        t.bodyScale = 1.08;
-        t.glow = 0.9;
+        t.bodyScale = 1.12;
+        t.glow = 1.0;
         t.glowColor = '#f59e0b';
         // Both arms up
-        t.leftArmAngle = -1.5;
-        t.rightArmAngle = -1.5;
+        t.leftArmAngle = -1.6;
+        t.rightArmAngle = -1.6;
         t.leftHandWave = 1.0;
         t.rightHandWave = 1.0;
         break;
@@ -329,9 +329,13 @@ const Avatar = {
     p.bodyOffsetY = Math.sin(this.breathPhase * Math.PI * 2) * 3;
 
     // Idle sway
-    this.idleSway += dt * 0.3;
+    this.idleSway += dt * 0.4;
     if (this.state === 'idle') {
-      p.headTilt = Math.sin(this.idleSway * Math.PI * 2) * 0.02;
+      p.headTilt = Math.sin(this.idleSway * Math.PI * 2) * 0.04;
+      p.bodyOffsetY += Math.sin(this.idleSway * Math.PI * 1.3) * 2;
+      t.pupilX = Math.sin(this.idleSway * Math.PI * 0.7) * 0.15;
+      t.pupilY = Math.cos(this.idleSway * Math.PI * 0.5) * 0.1;
+      t.mouthCurve = 0.15 + Math.sin(this.idleSway * Math.PI * 0.9) * 0.05;
     }
 
     // Blinking
@@ -449,7 +453,7 @@ const Avatar = {
     // Glow effect behind avatar
     if (p.glow > 0.01) {
       ctx.save();
-      const glowRadius = 90 * scale * (1 + p.glow * 0.5);
+      const glowRadius = 110 * scale * (1 + p.glow * 0.6);
       const glowGrad = ctx.createRadialGradient(cx, cy + p.bodyOffsetY, 0, cx, cy + p.bodyOffsetY, glowRadius);
       glowGrad.addColorStop(0, this.hexToRgba(p.glowColor, p.glow * 0.35));
       glowGrad.addColorStop(0.5, this.hexToRgba(p.glowColor, p.glow * 0.12));

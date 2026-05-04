@@ -109,21 +109,10 @@ const SessionTracker = {
     };
   },
 
-  getDifficultyLevel() {
-    const avg = this.getAverageScore();
-    const count = this.getSessionCount();
-
-    if (count < 3) return { level: 'beginner', label: 'Beginner', threshold: 60 };
-    if (avg >= 85) return { level: 'expert', label: 'Expert', threshold: 90 };
-    if (avg >= 70) return { level: 'intermediate', label: 'Intermediate', threshold: 75 };
-    return { level: 'beginner', label: 'Beginner', threshold: 60 };
-  },
-
   getEncouragingMessage(score) {
     const best = this.getPersonalBest();
     const streak = this.getStreak();
     const improvement = this.getRecentImprovement();
-    const difficulty = this.getDifficultyLevel();
     const isNewBest = this.isNewPersonalBest(score);
 
     if (isNewBest) {
@@ -135,13 +124,13 @@ const SessionTracker = {
     if (improvement && improvement.improved && improvement.change > 5) {
       return `You're improving! Up ${improvement.change} points from your earlier average.`;
     }
-    if (score >= difficulty.threshold) {
-      return `Solid ${difficulty.label}-level performance!`;
+    if (score >= 80) {
+      return 'Strong delivery! Keep refining the details.';
     }
-    if (score >= 70) {
+    if (score >= 60) {
       return 'Good work! Focus on the flagged areas for even better results.';
     }
-    return 'Keep practicing — every session builds your skills.';
+    return 'Keep practicing -- every session builds your skills.';
   },
 
   getStatsHTML() {
@@ -149,7 +138,6 @@ const SessionTracker = {
     const streak = this.getStreak();
     const best = this.getPersonalBest();
     const avg = this.getAverageScore();
-    const difficulty = this.getDifficultyLevel();
 
     if (count === 0) {
       return '<div class="session-stats-empty">No sessions yet. Start practicing!</div>';
@@ -174,7 +162,6 @@ const SessionTracker = {
           <div class="stat-label">Avg Score</div>
         </div>
       </div>
-      <div class="difficulty-badge ${difficulty.level}">${difficulty.label}</div>
     `;
   },
 };

@@ -222,7 +222,9 @@ async def generate_script_from_slide(slide_text: str, slide_index: int) -> str:
         f"You are a presentation coach. Given the text content of slide {slide_index + 1}, "
         f"write a natural, conversational speaker script (2-4 sentences) that a presenter "
         f"would say while showing this slide. Do not include stage directions or notes — "
-        f"just the spoken words.\n\n"
+        f"just the spoken words. Never use meta-references like 'on this slide', "
+        f"'this slide shows', 'as you can see here', or 'let me walk you through this slide'. "
+        f"Speak directly about the content as if talking to the audience.\n\n"
         f"Slide content:\n{slide_text}\n\n"
         f"Speaker script:"
     )
