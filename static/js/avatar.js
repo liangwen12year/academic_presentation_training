@@ -139,157 +139,168 @@ const Avatar = {
         break;
 
       case 'listening':
-        t.eyeOpenness = 1.2;
+        t.eyeOpenness = 1.4;
         t.pupilX = 0;
-        t.pupilY = -0.15;
-        t.pupilSize = 1.15;
-        t.mouthOpenness = 0;
-        t.mouthCurve = 0.15;
-        t.headTilt = 0.06;
-        t.eyebrowRaise = 0.4;
-        t.blush = 0;
-        t.glow = 0.3;
+        t.pupilY = -0.2;
+        t.pupilSize = 1.3;
+        t.mouthOpenness = 0.05;
+        t.mouthCurve = 0.25;
+        t.headTilt = 0.1;
+        t.eyebrowRaise = 0.6;
+        t.blush = 0.3;
+        t.glow = 0.5;
         t.glowColor = '#818cf8';
         // Cup hand to ear gesture
-        t.rightArmAngle = -0.8;
-        t.rightHandWave = 0.3;
-        break;
-
-      case 'thinking':
-        t.eyeOpenness = 0.75;
-        t.pupilX = 0.4;
-        t.pupilY = -0.4;
-        t.mouthOpenness = 0.08;
-        t.mouthCurve = 0;
-        t.headTilt = -0.05;
-        t.eyebrowRaise = 0.2;
-        t.blush = 0;
-        // Chin-rest gesture
         t.rightArmAngle = -1.0;
         t.rightHandWave = 0.5;
         break;
 
+      case 'thinking':
+        t.eyeOpenness = 0.55;
+        t.pupilX = 0.5;
+        t.pupilY = -0.5;
+        t.mouthOpenness = 0.12;
+        t.mouthCurve = -0.1;
+        t.headTilt = -0.1;
+        t.eyebrowRaise = 0.5;
+        t.blush = 0;
+        t.bodyScale = 0.97;
+        // Chin-rest gesture
+        t.rightArmAngle = -1.2;
+        t.rightHandWave = 0.7;
+        break;
+
       case 'speaking':
-        t.eyeOpenness = 1.0;
+        t.eyeOpenness = 1.1;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.mouthCurve = 0.12;
+        t.mouthCurve = 0.2;
         t.headTilt = 0;
-        t.eyebrowRaise = 0.1;
-        t.blush = 0;
-        t.glow = 0.2;
+        t.eyebrowRaise = 0.3;
+        t.blush = 0.2;
+        t.glow = 0.4;
+        t.bodyScale = 1.03;
         // Gesturing hand
-        t.rightArmAngle = -0.5;
+        t.rightArmAngle = -0.8;
+        t.rightHandWave = 0.3;
         break;
 
       case 'encouraging':
-        t.eyeOpenness = 0.75;
+        t.eyeOpenness = 0.6;
+        t.pupilX = 0;
+        t.pupilY = 0;
+        t.pupilSize = 1.5;
+        t.mouthOpenness = 0.35;
+        t.mouthCurve = 1.0;
+        t.headTilt = 0.08;
+        t.eyebrowRaise = 0.6;
+        t.blush = 1.0;
+        t.bodyScale = 1.12;
+        t.glow = 1.0;
+        t.glowColor = '#10b981';
+        // Thumbs up gesture
+        t.rightArmAngle = -1.6;
+        t.rightHandWave = 1.0;
+        t.leftArmAngle = -0.4;
+        break;
+
+      case 'concerned':
+        t.eyeOpenness = 1.3;
+        t.pupilX = 0;
+        t.pupilY = 0.15;
+        t.pupilSize = 1.2;
+        t.mouthOpenness = 0.1;
+        t.mouthCurve = -0.8;
+        t.headTilt = -0.1;
+        t.eyebrowRaise = 1.0;
+        t.blush = 0;
+        t.bodyScale = 0.93;
+        t.glow = 0.5;
+        t.glowColor = '#f59e0b';
+        t.leftArmAngle = -0.3;
+        break;
+
+      case 'pause_warning':
+        t.eyeOpenness = 1.5;
         t.pupilX = 0;
         t.pupilY = 0;
         t.pupilSize = 1.3;
         t.mouthOpenness = 0.2;
-        t.mouthCurve = 1.0;
-        t.headTilt = 0;
-        t.eyebrowRaise = 0.4;
-        t.blush = 1.0;
-        t.bodyScale = 1.08;
-        t.glow = 0.8;
-        t.glowColor = '#10b981';
-        // Thumbs up gesture
-        t.rightArmAngle = -1.4;
-        t.rightHandWave = 1.0;
-        break;
-
-      case 'concerned':
-        t.eyeOpenness = 1.1;
-        t.pupilX = 0;
-        t.pupilY = 0.08;
-        t.pupilSize = 1.1;
-        t.mouthOpenness = 0.06;
-        t.mouthCurve = -0.5;
-        t.headTilt = -0.06;
-        t.eyebrowRaise = 0.7;
+        t.mouthCurve = -0.2;
+        t.headTilt = 0.12;
+        t.eyebrowRaise = 1.0;
         t.blush = 0;
-        t.bodyScale = 0.97;
-        t.glow = 0.3;
+        t.glow = 0.7;
         t.glowColor = '#f59e0b';
-        break;
-
-      case 'pause_warning':
-        t.eyeOpenness = 1.3;
-        t.pupilX = 0;
-        t.pupilY = 0;
-        t.pupilSize = 1.2;
-        t.mouthOpenness = 0.12;
-        t.mouthCurve = -0.15;
-        t.headTilt = 0.08;
-        t.eyebrowRaise = 0.8;
-        t.blush = 0;
-        t.glow = 0.5;
-        t.glowColor = '#f59e0b';
+        t.bodyScale = 1.05;
         // Waving hand
-        t.rightArmAngle = -1.4;
+        t.rightArmAngle = -1.6;
         t.rightHandWave = 1.0;
         break;
 
       case 'pace_warning':
-        t.eyeOpenness = 0.85;
+        t.eyeOpenness = 0.7;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.mouthOpenness = 0.03;
-        t.mouthCurve = -0.25;
-        t.headTilt = -0.04;
-        t.eyebrowRaise = 0.5;
+        t.mouthOpenness = 0.08;
+        t.mouthCurve = -0.4;
+        t.headTilt = -0.08;
+        t.eyebrowRaise = 0.8;
         t.blush = 0;
-        t.glow = 0.3;
+        t.glow = 0.5;
         t.glowColor = '#ef4444';
-        // "Slow down" palm-out gesture
-        t.leftArmAngle = -0.6;
-        t.leftHandWave = 0.5;
+        t.bodyScale = 0.95;
+        // "Slow down" palm-out gesture — both hands
+        t.leftArmAngle = -0.9;
+        t.leftHandWave = 0.7;
+        t.rightArmAngle = -0.9;
+        t.rightHandWave = 0.7;
         break;
 
       case 'filler_warning':
-        t.eyeOpenness = 1.15;
-        t.pupilX = 0.2;
-        t.pupilY = -0.15;
-        t.mouthOpenness = 0;
-        t.mouthCurve = 0;
-        t.headTilt = 0;
-        t.eyebrowRaise = 0.9;
+        t.eyeOpenness = 1.3;
+        t.pupilX = 0.3;
+        t.pupilY = -0.2;
+        t.mouthOpenness = 0.05;
+        t.mouthCurve = -0.15;
+        t.headTilt = -0.06;
+        t.eyebrowRaise = 1.0;
         t.blush = 0;
-        t.glow = 0.25;
+        t.glow = 0.4;
         t.glowColor = '#f59e0b';
+        t.rightArmAngle = -0.5;
         break;
 
       case 'celebrating':
-        t.eyeOpenness = 0.65;
+        t.eyeOpenness = 0.5;
         t.pupilX = 0;
         t.pupilY = 0;
-        t.pupilSize = 1.4;
-        t.mouthOpenness = 0.35;
+        t.pupilSize = 1.5;
+        t.mouthOpenness = 0.5;
         t.mouthCurve = 1.0;
         t.headTilt = 0;
-        t.eyebrowRaise = 0.5;
+        t.eyebrowRaise = 0.7;
         t.blush = 1.0;
-        t.bodyScale = 1.12;
+        t.bodyScale = 1.15;
         t.glow = 1.0;
         t.glowColor = '#f59e0b';
-        // Both arms up
-        t.leftArmAngle = -1.6;
-        t.rightArmAngle = -1.6;
+        // Both arms up high
+        t.leftArmAngle = -1.8;
+        t.rightArmAngle = -1.8;
         t.leftHandWave = 1.0;
         t.rightHandWave = 1.0;
         break;
 
       case 'demonstrating':
-        t.eyeOpenness = 1.0;
+        t.eyeOpenness = 1.1;
         t.pupilX = 0;
-        t.pupilY = 0.1;
-        t.mouthCurve = 0.05;
-        t.headTilt = 0;
-        t.eyebrowRaise = 0;
+        t.pupilY = 0.15;
+        t.mouthCurve = 0.1;
+        t.headTilt = 0.04;
+        t.eyebrowRaise = 0.2;
         t.blush = 0;
-        t.glow = 0.15;
+        t.glow = 0.3;
+        t.rightArmAngle = -0.6;
         break;
     }
   },
@@ -362,19 +373,19 @@ const Avatar = {
     // Speaking mouth — more varied and energetic
     if (this.state === 'speaking') {
       this.speakPhase += dt * 12;
-      const speakAmp = 0.18 + Math.sin(this.speakPhase * 2.3) * 0.12
-        + Math.sin(this.speakPhase * 5.7) * 0.1
-        + Math.sin(this.speakPhase * 0.7) * 0.06;
-      t.mouthOpenness = Math.max(0.05, Math.min(0.5, speakAmp));
+      const speakAmp = 0.25 + Math.sin(this.speakPhase * 2.3) * 0.15
+        + Math.sin(this.speakPhase * 5.7) * 0.12
+        + Math.sin(this.speakPhase * 0.7) * 0.08;
+      t.mouthOpenness = Math.max(0.08, Math.min(0.65, speakAmp));
     }
 
     // Nod for encouraging — more vigorous
     if (this.state === 'encouraging' && this.nodCount < 4) {
       this.nodTimer += dt;
       if (this.nodTimer < 0.2) {
-        p.headBob = -6;
+        p.headBob = -10;
       } else if (this.nodTimer < 0.4) {
-        p.headBob = 6;
+        p.headBob = 10;
       } else {
         this.nodTimer = 0;
         this.nodCount++;
@@ -386,7 +397,7 @@ const Avatar = {
 
     // Celebrating — bouncy body and waving arms
     if (this.state === 'celebrating') {
-      const bounce = Math.sin(performance.now() / 150) * 5;
+      const bounce = Math.sin(performance.now() / 120) * 10;
       p.bodyOffsetY += bounce;
       t.leftArmAngle = -1.5 + Math.sin(performance.now() / 200) * 0.3;
       t.rightArmAngle = -1.5 + Math.sin(performance.now() / 200 + 1) * 0.3;
@@ -397,13 +408,16 @@ const Avatar = {
       t.rightHandWave = 0.5 + Math.sin(performance.now() / 150) * 0.5;
     }
 
-    // Listening — pupils track with subtle energy reactivity
+    // Listening — pupils track with strong energy reactivity
     if (this.state === 'listening') {
-      t.pupilX = Math.sin(performance.now() / 2000) * 0.1;
-      t.pupilY = -0.15 + Math.cos(performance.now() / 3000) * 0.05;
-      // Body reacts to energy — subtle lean-in
-      t.headTilt = 0.06 + this.energyLevel * 0.04;
-      t.bodyScale = 1.0 + this.energyLevel * 0.03;
+      t.pupilX = Math.sin(performance.now() / 1500) * 0.15;
+      t.pupilY = -0.2 + Math.cos(performance.now() / 2000) * 0.1;
+      // Body reacts to energy — visible lean-in and glow
+      t.headTilt = 0.1 + this.energyLevel * 0.08;
+      t.bodyScale = 1.0 + this.energyLevel * 0.08;
+      t.eyebrowRaise = 0.6 + this.energyLevel * 0.4;
+      t.glow = 0.5 + this.energyLevel * 0.5;
+      t.mouthCurve = 0.25 + this.energyLevel * 0.3;
     }
 
     // Thinking dots
@@ -748,7 +762,7 @@ const Avatar = {
 
     if (openness > 0.03) {
       ctx.beginPath();
-      const openH = openness * 22;
+      const openH = openness * 36;
 
       ctx.moveTo(-mouthWidth, 0);
       ctx.quadraticCurveTo(0, -curve * 8, mouthWidth, 0);
@@ -876,11 +890,11 @@ const Avatar = {
   setAmplitude(value) {
     this.energyLevel = value;
     if (this.state === 'speaking') {
-      this.targets.mouthOpenness = 0.05 + value * 0.45;
+      this.targets.mouthOpenness = 0.1 + value * 0.55;
     }
     if (this.state === 'listening') {
-      // Mouth slightly mirrors the speaker's energy
-      this.targets.mouthOpenness = value * 0.08;
+      // Mouth mirrors the speaker's energy
+      this.targets.mouthOpenness = value * 0.2;
     }
   },
 };
