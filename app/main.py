@@ -232,6 +232,48 @@ async def pronounce_word(
     return {"audio_url": audio_url, "word": word}
 
 
+@app.post("/api/speak-feedback")
+async def speak_feedback(
+    presentation_id: str = Form(...),
+    text: str = Form(...),
+):
+    """Generate spoken feedback audio using ElevenLabs TTS."""
+    pres = sessions.get(presentation_id)
+    if not pres:
+        raise HTTPException(404, "Presentation not found")
+
+    try:
+        from app.tts import _has_real_key, DEFAULT_VOICES
+        if not _has_real_key():
+            raise HTTPException(400, "ELEVENLABS_API_KEY not configured")
+
+        from elevenlabs.client import ElevenLabs as ELClient
+        client = ELClient(api_key=settings.elevenlabs_api_key)
+
+        audio_iter = client.text_to_speech.convert(
+            voice_id=DEFAULT_VOICES["professional"],
+            text=text,
+            model_id="eleven_multilingual_v2",
+            voice_settings={
+                "stability": 0.55,
+                "similarity_boost": 0.75,
+                "style": 0.35,
+                "use_speaker_boost": True,
+            },
+        )
+        audio_bytes = b"".join(audio_iter)
+
+        out_dir = settings.audio_dir / pres.id
+        out_dir.mkdir(parents=True, exist_ok=True)
+        filename = "feedback_audio.mp3"
+        out_path = out_dir / filename
+        out_path.write_bytes(audio_bytes)
+
+        return {"audio_url": f"/static/audio/{pres.id}/{filename}"}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/session/{presentation_id}")
 async def get_session(presentation_id: str):
     """Get current session data."""

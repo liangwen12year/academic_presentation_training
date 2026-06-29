@@ -28,6 +28,9 @@ const App = {
     this.bindVoiceSelect();
     this.initAvatarMode();
     this.renderSessionStats();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+    }
   },
 
   // ── Avatar Mode ───────────────────────────────────────────────
@@ -60,9 +63,11 @@ const App = {
 
     if (this.state.coachMode === 'avatar') {
       avatarContainer.classList.remove('hidden');
-      if (!Avatar.canvas) {
-        Avatar.init(document.getElementById('avatar-canvas'));
+      if (Avatar.canvas) {
+        Avatar.destroy();
+        Avatar.canvas = null;
       }
+      Avatar.init(document.getElementById('avatar-canvas'));
       Avatar.setState('idle');
     } else {
       avatarContainer.classList.add('hidden');
@@ -790,35 +795,111 @@ const App = {
 
   // ── Post-Analysis Coaching ────────────────────────────────────
 
-  _ensureVoicesReady() {
-    return new Promise((resolve) => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) return resolve(voices);
-      window.speechSynthesis.onvoiceschanged = () => resolve(window.speechSynthesis.getVoices());
-      setTimeout(() => resolve(window.speechSynthesis.getVoices()), 3000);
-    });
-  },
-
   async listenToResults() {
     const btn = document.getElementById('btn-listen-results');
-    if (!('speechSynthesis' in window)) {
-      btn.textContent = '🔊 Not supported';
-      return;
-    }
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+
+    // Stop if already playing
+    if (this._feedbackAudio && !this._feedbackAudio.paused) {
+      this._feedbackAudio.pause();
+      this._feedbackAudio.currentTime = 0;
       btn.textContent = '🔊 Listen to Results';
       this.updateAvatarState('idle');
       return;
     }
-    if (this.state.lastAnalysis) {
-      btn.textContent = '⏳ Preparing...';
-      btn.disabled = true;
-      await this._ensureVoicesReady();
+
+    if (!this.state.lastAnalysis) return;
+
+    btn.textContent = '⏳ Generating...';
+    btn.disabled = true;
+
+    const text = this._buildSpokenSummary();
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('text', text);
+
+    try {
+      const res = await fetch('/api/speak-feedback', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      this._feedbackAudio = new Audio(data.audio_url);
+      this._feedbackAudio.onplay = () => this.updateAvatarState('speaking');
+      this._feedbackAudio.onended = () => {
+        this.updateAvatarState('idle');
+        btn.textContent = '🔊 Listen to Results';
+      };
+      this._feedbackAudio.onerror = () => {
+        btn.textContent = '🔊 Listen to Results';
+      };
       btn.textContent = '⏹ Stop';
       btn.disabled = false;
-      this.speakCoachFeedback(this.state.lastCoachMsg, this.state.lastAnalysis);
+      this._feedbackAudio.play();
+    } catch (err) {
+      btn.textContent = '🔊 Listen to Results';
+      btn.disabled = false;
+      alert('Could not generate audio: ' + err.message);
     }
+  },
+
+  _buildSpokenSummary() {
+    const data = this.state.lastAnalysis;
+    const message = this.state.lastCoachMsg;
+    let spoken = message + '. ';
+
+    if (data.pacing.assessment === 'a_bit_fast') {
+      spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
+    } else if (data.pacing.assessment === 'a_bit_slow') {
+      spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
+    } else {
+      spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;
+    }
+
+    if (data.filler_count > 0) {
+      spoken += `I noticed ${data.filler_count} filler word${data.filler_count > 1 ? 's' : ''}. Try to reduce those in your next attempt. `;
+    }
+
+    if (data.flagged_words.length > 0) {
+      const redCount = data.flagged_words.filter((f) => f.flag === 'red').length;
+      if (redCount > 0) {
+        spoken += `There were ${redCount} pronunciation issue${redCount > 1 ? 's' : ''} to work on. `;
+      }
+    }
+    return spoken;
+  },
+
+  _speakResults(btn, attempt) {
+    window.speechSynthesis.cancel();
+    const spoken = this._buildSpokenSummary();
+    const utterance = new SpeechSynthesisUtterance(spoken);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+
+    let started = false;
+    utterance.onstart = () => {
+      started = true;
+      this.updateAvatarState('speaking');
+    };
+    utterance.onend = () => {
+      this.updateAvatarState('idle');
+      btn.textContent = '🔊 Listen to Results';
+    };
+    utterance.onerror = () => {
+      if (attempt < 3) {
+        setTimeout(() => this._speakResults(btn, attempt + 1), 150);
+      } else {
+        btn.textContent = '🔊 Listen to Results';
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+
+    // If speech didn't start within 500ms, retry (Chrome silent failure)
+    setTimeout(() => {
+      if (!started && !window.speechSynthesis.speaking && attempt < 3) {
+        window.speechSynthesis.cancel();
+        this._speakResults(btn, attempt + 1);
+      }
+    }, 500);
   },
 
   speakCoachFeedback(message, data) {
