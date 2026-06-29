@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: presentation-training-coach
+    runtime: docker
+    plan: free
+    envVars:
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: openai
+      - key: WHISPER_MODEL
+        value: base

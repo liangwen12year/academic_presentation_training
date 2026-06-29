@@ -1,0 +1,11 @@
+.venv
+.env
+__pycache__
+*.pyc
+uploads/*
+static/audio/*
+static/slides/*
+.git
+=70.0.0
+final_report.*
+texput.log
