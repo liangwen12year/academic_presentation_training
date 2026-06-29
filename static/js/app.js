@@ -139,6 +139,7 @@ const App = {
 
       document.getElementById('upload-section').classList.add('hidden');
       document.getElementById('practice-section').classList.remove('hidden');
+      this.applyAvatarMode();
       this.renderSlide();
     } catch (err) {
       alert('Upload failed: ' + err.message);
@@ -199,6 +200,9 @@ const App = {
 
     // Clear previous analysis and recording review
     document.getElementById('analysis-results').classList.add('hidden');
+    const listenBtn = document.getElementById('btn-listen-results');
+    if (listenBtn) listenBtn.classList.add('hidden');
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
     const reviewCard = document.getElementById('recording-review');
     if (reviewCard) reviewCard.classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
@@ -665,13 +669,20 @@ const App = {
       this.updateAvatarState('concerned', 5000);
     }
 
-    // Coaching message (text only, no speech)
+    // Coaching message
     const coachMsg = SessionTracker.getEncouragingMessage(data.overall_score);
     const coachMsgEl = document.getElementById('coach-message');
     if (coachMsgEl) {
       coachMsgEl.textContent = coachMsg;
       coachMsgEl.classList.remove('hidden');
     }
+
+    // Store for listen button and pre-warm voices
+    this.state.lastAnalysis = data;
+    this.state.lastCoachMsg = coachMsg;
+    const listenBtn = document.getElementById('btn-listen-results');
+    if (listenBtn) listenBtn.classList.remove('hidden');
+    if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
 
     // Recording playback & transcript card
     const reviewCard = document.getElementById('recording-review');
@@ -779,6 +790,37 @@ const App = {
 
   // ── Post-Analysis Coaching ────────────────────────────────────
 
+  _ensureVoicesReady() {
+    return new Promise((resolve) => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) return resolve(voices);
+      window.speechSynthesis.onvoiceschanged = () => resolve(window.speechSynthesis.getVoices());
+      setTimeout(() => resolve(window.speechSynthesis.getVoices()), 3000);
+    });
+  },
+
+  async listenToResults() {
+    const btn = document.getElementById('btn-listen-results');
+    if (!('speechSynthesis' in window)) {
+      btn.textContent = '🔊 Not supported';
+      return;
+    }
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      btn.textContent = '🔊 Listen to Results';
+      this.updateAvatarState('idle');
+      return;
+    }
+    if (this.state.lastAnalysis) {
+      btn.textContent = '⏳ Preparing...';
+      btn.disabled = true;
+      await this._ensureVoicesReady();
+      btn.textContent = '⏹ Stop';
+      btn.disabled = false;
+      this.speakCoachFeedback(this.state.lastCoachMsg, this.state.lastAnalysis);
+    }
+  },
+
   speakCoachFeedback(message, data) {
     if (!('speechSynthesis' in window)) return;
 
@@ -809,7 +851,11 @@ const App = {
     utterance.rate = 0.95;
     utterance.pitch = 1.0;
     utterance.onstart = () => this.updateAvatarState('speaking');
-    utterance.onend = () => this.updateAvatarState('idle');
+    utterance.onend = () => {
+      this.updateAvatarState('idle');
+      const btn = document.getElementById('btn-listen-results');
+      if (btn) btn.textContent = '🔊 Listen to Results';
+    };
     window.speechSynthesis.speak(utterance);
   },
 
