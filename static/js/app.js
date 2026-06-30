@@ -60,8 +60,9 @@ const App = {
 
   applyAvatarMode() {
     const avatarContainer = document.getElementById('avatar-container');
+    const practiceVisible = !document.getElementById('practice-section').classList.contains('hidden');
 
-    if (this.state.coachMode === 'avatar') {
+    if (this.state.coachMode === 'avatar' && practiceVisible) {
       avatarContainer.classList.remove('hidden');
       if (Avatar.canvas) {
         Avatar.destroy();
@@ -69,14 +70,14 @@ const App = {
       }
       Avatar.init(document.getElementById('avatar-canvas'));
       Avatar.setState('idle');
-    } else {
+    } else if (this.state.coachMode !== 'avatar') {
       avatarContainer.classList.add('hidden');
       if (Avatar.animId) { Avatar.destroy(); Avatar.canvas = null; }
     }
   },
 
   updateAvatarState(newState, autoRevertMs) {
-    if (this.state.coachMode !== 'avatar' || !Avatar.canvas) return;
+    if (this.state.coachMode !== 'avatar' || typeof Avatar === 'undefined' || !Avatar.canvas) return;
     Avatar.setState(newState);
 
     if (this.state.avatarReactionTimeout) {
