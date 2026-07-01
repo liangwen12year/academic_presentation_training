@@ -218,19 +218,19 @@ def compute_pacing(
     if reference_duration and reference_duration > 0:
         ref_wpm = (script_word_count / reference_duration * 60)
     else:
-        ref_wpm = 120.0  # average presentation pace
+        ref_wpm = 110.0  # typical academic/professional presentation pace
 
     ratio = user_wpm / ref_wpm if ref_wpm > 0 else 1.0
 
-    if ratio > 1.35:
+    if ratio > 1.45:
         assessment = "a_bit_fast"
-        detail = f"You spoke at {user_wpm:.0f} WPM, {((ratio - 1) * 100):.0f}% faster than the target {ref_wpm:.0f} WPM. Try slowing down slightly."
-    elif ratio < 0.65:
+        detail = f"You spoke at {user_wpm:.0f} WPM, which is faster than the typical {ref_wpm:.0f} WPM range. Consider slowing down slightly."
+    elif ratio < 0.55:
         assessment = "a_bit_slow"
-        detail = f"You spoke at {user_wpm:.0f} WPM, {((1 - ratio) * 100):.0f}% slower than the target {ref_wpm:.0f} WPM. Try picking up the pace a bit."
+        detail = f"You spoke at {user_wpm:.0f} WPM, which is slower than the typical {ref_wpm:.0f} WPM range. Try picking up the pace a bit."
     else:
         assessment = "good"
-        detail = f"Your pace of {user_wpm:.0f} WPM is well within the natural range around {ref_wpm:.0f} WPM."
+        detail = f"Your pace of {user_wpm:.0f} WPM is well within the natural range."
 
     return PacingResult(
         user_wpm=round(user_wpm, 1),

@@ -254,6 +254,22 @@ const App = {
     });
   },
 
+  // ── Session Expiry Handling ────────────────────────────────────
+
+  _handleSessionExpired() {
+    alert('Your session has expired (the server restarted). Please re-upload your slides.');
+    document.getElementById('practice-section').classList.add('hidden');
+    document.getElementById('upload-section').classList.remove('hidden');
+    this.state.presentationId = null;
+    this.state.slides = [];
+    this.updateAvatarState('idle');
+    this.hideLoading();
+  },
+
+  _isSessionExpired(res, errText) {
+    return res.status === 404 && (errText.includes('not found') || errText.includes('Presentation'));
+  },
+
   // ── Generate Reference Audio ───────────────────────────────────
 
   async generateReference() {
@@ -268,6 +284,7 @@ const App = {
       const res = await fetch('/api/generate-reference', { method: 'POST', body: form });
       if (!res.ok) {
         const errText = await res.text();
+        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
         if (res.status === 400 && errText.includes('ELEVENLABS_API_KEY')) {
           this.hideLoading();
           this.speakWithBrowser(this.state.slides[this.state.currentSlide].script);
@@ -637,7 +654,11 @@ const App = {
 
     try {
       const res = await fetch('/api/analyze', { method: 'POST', body: form });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errText = await res.text();
+        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
+        throw new Error(errText);
+      }
       const data = await res.json();
       this.renderAnalysis(data);
     } catch (err) {

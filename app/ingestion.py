@@ -219,12 +219,14 @@ def _extract_slide_text(slide) -> str:
 async def generate_script_from_slide(slide_text: str, slide_index: int) -> str:
     """Use an LLM to generate a presentation script from slide content."""
     prompt = (
-        f"You are a presentation coach. Given the text content of slide {slide_index + 1}, "
-        f"write a natural, conversational speaker script (2-4 sentences) that a presenter "
-        f"would say while showing this slide. Do not include stage directions or notes — "
-        f"just the spoken words. Never use meta-references like 'on this slide', "
-        f"'this slide shows', 'as you can see here', or 'let me walk you through this slide'. "
-        f"Speak directly about the content as if talking to the audience.\n\n"
+        f"You are helping a researcher prepare a talk. Given the text from slide {slide_index + 1}, "
+        f"write a clear, professional speaker script (2-4 sentences) that the presenter would "
+        f"say aloud. Match the tone and register of the slide content — if it is technical or "
+        f"academic, keep the script precise and scholarly, not casual or hype-driven. "
+        f"Do NOT use filler phrases like 'Today we're diving into', 'Let's explore', or "
+        f"'exciting projects'. Do NOT use meta-references like 'on this slide' or 'as you can see'. "
+        f"Preserve all proper nouns, author names, and technical terms exactly as written. "
+        f"Just output the spoken words, nothing else.\n\n"
         f"Slide content:\n{slide_text}\n\n"
         f"Speaker script:"
     )
