@@ -249,9 +249,9 @@ async def generate_script_from_slide(slide_text: str, slide_index: int) -> str:
 
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5.4-mini",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=300,
+                max_completion_tokens=300,
             )
             return response.choices[0].message.content.strip()
         else:
