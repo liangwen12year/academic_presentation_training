@@ -537,13 +537,13 @@ const App = {
       const indicator = document.getElementById('rt-pace-indicator');
       if (indicator) {
         if (pace === 'fast') {
-          indicator.textContent = 'Too Fast';
+          indicator.textContent = 'A Bit Fast';
           indicator.className = 'rt-pace danger';
-          if (Avatar.canvas && Avatar.state === 'listening') {
+          if (typeof Avatar !== 'undefined' && Avatar.canvas && Avatar.state === 'listening') {
             Avatar.briefReaction('pace_warning', 1500);
           }
         } else if (pace === 'slow') {
-          indicator.textContent = 'Too Slow';
+          indicator.textContent = 'A Bit Slow';
           indicator.className = 'rt-pace warning';
         } else {
           indicator.textContent = 'Good';

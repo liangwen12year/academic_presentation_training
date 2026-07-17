@@ -163,9 +163,9 @@ const RealtimeCoach = {
         this.stats.paceHistory.push({ time: now, wpm: estimatedWpm });
 
         if (this.onPaceChange) {
-          if (estimatedWpm > 180) {
+          if (estimatedWpm > 160) {
             this.onPaceChange('fast');
-          } else if (estimatedWpm < 80) {
+          } else if (estimatedWpm < 60) {
             this.onPaceChange('slow');
           } else {
             this.onPaceChange('good');
