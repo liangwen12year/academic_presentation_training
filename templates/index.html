@@ -122,6 +122,43 @@
         <!-- Sidebar -->
         <div class="sidebar">
 
+          <!-- Recording (moved to top for visibility) -->
+          <div class="card recording-section">
+            <div class="section-header">Your Recording</div>
+
+            <div class="waveform-container">
+              <canvas id="waveform-canvas"></canvas>
+            </div>
+
+            <div class="rec-controls">
+              <button id="btn-record" class="btn btn-primary">🎙 Start Recording</button>
+            </div>
+            <div id="recording-status" class="status">Ready to record</div>
+
+            <!-- Real-time Feedback Panel -->
+            <div id="realtime-feedback" class="realtime-feedback hidden">
+              <div class="rt-row">
+                <span class="rt-label">Pace</span>
+                <span id="rt-pace-indicator" class="rt-pace">--</span>
+              </div>
+              <div class="rt-row">
+                <span class="rt-label">Energy</span>
+                <div class="rt-energy-track">
+                  <div id="rt-energy-bar" class="rt-energy-fill"></div>
+                </div>
+              </div>
+              <div class="rt-row">
+                <span class="rt-label">Fillers</span>
+                <span id="rt-filler-count" class="rt-filler-count">0</span>
+              </div>
+              <div id="rt-alerts" class="rt-alerts"></div>
+            </div>
+
+            <button id="btn-submit-recording" class="btn btn-primary btn-block" style="margin-top:0.75rem;" disabled onclick="App.submitRecording()">
+              Analyze Recording
+            </button>
+          </div>
+
           <!-- Avatar Coach -->
           <div id="avatar-container" class="card avatar-card hidden">
             <canvas id="avatar-canvas"></canvas>
@@ -179,42 +216,6 @@
             </button>
           </div>
 
-          <!-- Recording -->
-          <div class="card recording-section">
-            <div class="section-header">Your Recording</div>
-
-            <div class="waveform-container">
-              <canvas id="waveform-canvas"></canvas>
-            </div>
-
-            <div class="rec-controls">
-              <button id="btn-record" class="btn btn-primary">🎙 Start Recording</button>
-            </div>
-            <div id="recording-status" class="status">Ready to record</div>
-
-            <!-- Real-time Feedback Panel -->
-            <div id="realtime-feedback" class="realtime-feedback hidden">
-              <div class="rt-row">
-                <span class="rt-label">Pace</span>
-                <span id="rt-pace-indicator" class="rt-pace">--</span>
-              </div>
-              <div class="rt-row">
-                <span class="rt-label">Energy</span>
-                <div class="rt-energy-track">
-                  <div id="rt-energy-bar" class="rt-energy-fill"></div>
-                </div>
-              </div>
-              <div class="rt-row">
-                <span class="rt-label">Fillers</span>
-                <span id="rt-filler-count" class="rt-filler-count">0</span>
-              </div>
-              <div id="rt-alerts" class="rt-alerts"></div>
-            </div>
-
-            <button id="btn-submit-recording" class="btn btn-primary btn-block" style="margin-top:0.75rem;" disabled onclick="App.submitRecording()">
-              Analyze Recording
-            </button>
-          </div>
 
         </div>
       </div>
