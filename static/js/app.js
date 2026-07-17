@@ -125,8 +125,8 @@ const App = {
   },
 
   async uploadFile(file) {
-    if (!file.name.endsWith('.pptx')) {
-      alert('Please upload a .pptx file');
+    if (!file.name.endsWith('.pptx') && !file.name.endsWith('.pdf')) {
+      alert('Please upload a .pptx or .pdf file');
       return;
     }
 

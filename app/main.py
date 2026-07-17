@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 
 from app.config import settings
-from app.ingestion import PresentationData, ingest_pptx
+from app.ingestion import PresentationData, ingest_pptx, ingest_pdf
 from app.tts import clone_voice, generate_reference_audio, generate_word_audio, get_cloned_voice_id
 from app.analysis import analyze_recording
 
@@ -33,16 +33,23 @@ async def index(request: Request):
 
 
 @app.post("/api/upload")
-async def upload_pptx(file: UploadFile = File(...)):
-    """Upload a PPTX file, extract slides and scripts."""
-    if not file.filename or not file.filename.endswith(".pptx"):
-        raise HTTPException(400, "Only .pptx files are supported")
+async def upload_presentation(file: UploadFile = File(...)):
+    """Upload a PPTX or PDF file, extract slides and scripts."""
+    if not file.filename:
+        raise HTTPException(400, "No file provided")
+
+    filename_lower = file.filename.lower()
+    if not (filename_lower.endswith(".pptx") or filename_lower.endswith(".pdf")):
+        raise HTTPException(400, "Only .pptx and .pdf files are supported")
 
     save_path = settings.upload_dir / f"{uuid.uuid4().hex}_{file.filename}"
     with open(save_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    pres = await ingest_pptx(save_path)
+    if filename_lower.endswith(".pdf"):
+        pres = await ingest_pdf(save_path)
+    else:
+        pres = await ingest_pptx(save_path)
     sessions[pres.id] = pres
 
     return {

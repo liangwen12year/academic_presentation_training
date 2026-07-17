@@ -261,6 +261,75 @@ async def generate_script_from_slide(slide_text: str, slide_index: int) -> str:
         return fallback
 
 
+async def ingest_pdf(filepath: Path) -> PresentationData:
+    """Parse a PDF file and return structured slide data."""
+    pres_id = uuid.uuid4().hex[:12]
+    out_dir = settings.slides_dir / pres_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Render PDF pages to PNGs using pdftoppm
+    image_paths: list[str] = []
+    try:
+        subprocess.run(
+            ["pdftoppm", "-png", "-r", "200", str(filepath), str(out_dir / "slide")],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
+        png_files = sorted(out_dir.glob("slide-*.png"))
+        for idx, png_file in enumerate(png_files):
+            filename = f"slide_{idx:03d}.png"
+            png_file.rename(out_dir / filename)
+            image_paths.append(f"/static/slides/{pres_id}/{filename}")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    if not image_paths:
+        try:
+            from pdf2image import convert_from_path
+            images = convert_from_path(str(filepath), dpi=200)
+            for idx, img in enumerate(images):
+                filename = f"slide_{idx:03d}.png"
+                img.save(str(out_dir / filename), "PNG")
+                image_paths.append(f"/static/slides/{pres_id}/{filename}")
+        except (ImportError, Exception) as e:
+            print(f"[WARN] PDF rendering failed: {e}")
+
+    # Extract text per page using pdftotext
+    page_texts: list[str] = []
+    try:
+        for page_num in range(len(image_paths)):
+            result = subprocess.run(
+                ["pdftotext", "-f", str(page_num + 1), "-l", str(page_num + 1), str(filepath), "-"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            page_texts.append(result.stdout.strip())
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # Pad page_texts if extraction failed for some pages
+    while len(page_texts) < len(image_paths):
+        page_texts.append("")
+
+    slides: list[SlideData] = []
+    for idx in range(len(image_paths)):
+        slide_text = page_texts[idx] if idx < len(page_texts) else ""
+        script = await generate_script_from_slide(slide_text, idx) if slide_text else f"Slide {idx + 1}."
+
+        slides.append(
+            SlideData(
+                index=idx,
+                image_path=image_paths[idx],
+                notes="",
+                script=script,
+            )
+        )
+
+    return PresentationData(id=pres_id, filename=filepath.name, slides=slides)
+
+
 async def ingest_pptx(filepath: Path) -> PresentationData:
     """Parse a PPTX file and return structured slide data."""
     pres_id = uuid.uuid4().hex[:12]
