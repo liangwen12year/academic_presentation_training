@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import uuid
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -279,6 +281,47 @@ async def speak_feedback(
         return {"audio_url": f"/static/audio/{pres.id}/{filename}"}
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/self-rating")
+async def submit_self_rating(
+    presentation_id: str = Form(...),
+    slide_index: int = Form(...),
+    overall: int = Form(...),
+    confidence: int = Form(...),
+    ai_score: float = Form(...),
+):
+    """Save a user's self-assessment rating alongside the AI score."""
+    ratings_file = settings.data_dir / "self_ratings.jsonl"
+
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "presentation_id": presentation_id,
+        "slide_index": slide_index,
+        "self_overall": overall,
+        "self_confidence": confidence,
+        "ai_score": ai_score,
+    }
+
+    with open(ratings_file, "a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+    return {"ok": True}
+
+
+@app.get("/api/ratings")
+async def get_ratings():
+    """Retrieve all self-assessment ratings (for study analysis)."""
+    ratings_file = settings.data_dir / "self_ratings.jsonl"
+    if not ratings_file.exists():
+        return {"ratings": []}
+
+    ratings = []
+    for line in ratings_file.read_text().strip().split("\n"):
+        if line:
+            ratings.append(json.loads(line))
+
+    return {"ratings": ratings}
 
 
 @app.get("/api/session/{presentation_id}")

@@ -18,13 +18,14 @@ class Settings(BaseSettings):
     static_dir: Path = base_dir / "static"
     audio_dir: Path = static_dir / "audio"
     slides_dir: Path = static_dir / "slides"
+    data_dir: Path = base_dir / "data"
 
     class Config:
         env_file = ".env"
         extra = "ignore"
 
     def ensure_dirs(self) -> None:
-        for d in (self.upload_dir, self.audio_dir, self.slides_dir):
+        for d in (self.upload_dir, self.audio_dir, self.slides_dir, self.data_dir):
             d.mkdir(parents=True, exist_ok=True)
 
 

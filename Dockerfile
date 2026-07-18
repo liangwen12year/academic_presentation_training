@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p uploads static/audio static/slides
+RUN mkdir -p uploads static/audio static/slides data
 
 EXPOSE 8000
 

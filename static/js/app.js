@@ -1039,7 +1039,7 @@ const App = {
     }
   },
 
-  submitSelfRating() {
+  async submitSelfRating() {
     const { overall, confidence } = this.selfRatings;
     if (overall === 0 || confidence === 0) {
       alert('Please rate both your overall delivery and speaking confidence.');
@@ -1049,6 +1049,20 @@ const App = {
     const feedbackEl = document.getElementById('rating-feedback');
     const aiScore = this.state.lastAnalysis ? Math.round(this.state.lastAnalysis.overall_score) : null;
     const selfScore = Math.round((overall / 5) * 100);
+
+    // Save to backend
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('slide_index', this.state.currentSlide);
+    form.append('overall', overall);
+    form.append('confidence', confidence);
+    form.append('ai_score', aiScore || 0);
+
+    try {
+      await fetch('/api/self-rating', { method: 'POST', body: form });
+    } catch (err) {
+      console.warn('Failed to save rating:', err);
+    }
 
     let msg = `You rated yourself ${overall}/5 overall and ${confidence}/5 confidence. `;
     if (aiScore !== null) {
