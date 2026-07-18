@@ -812,6 +812,19 @@ const App = {
       if (fillerCountEl) fillerCountEl.textContent = data.filler_count;
     }
 
+    // Reset and init self-rating panel
+    this.selfRatings = { overall: 0, confidence: 0 };
+    const ratingBtn = document.getElementById('btn-submit-rating');
+    if (ratingBtn) { ratingBtn.textContent = 'Submit Rating'; ratingBtn.disabled = false; }
+    const ratingFeedback = document.getElementById('rating-feedback');
+    if (ratingFeedback) ratingFeedback.textContent = '';
+    document.querySelectorAll('.star-rating .star').forEach((s) => {
+      s.classList.remove('selected', 'hovered');
+      s.innerHTML = '&#9734;';
+    });
+    document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
+    this.initStarRatings();
+
     container.scrollIntoView({ behavior: 'smooth' });
   },
 
@@ -988,6 +1001,74 @@ const App = {
     } catch (err) {
       this.speakWithBrowser(word);
     }
+  },
+
+  // ── Self-Rating ───────────────────────────────────────────────
+
+  selfRatings: { overall: 0, confidence: 0 },
+
+  initStarRatings() {
+    for (const group of ['star-overall', 'star-confidence']) {
+      const container = document.getElementById(group);
+      if (!container) continue;
+      const key = group === 'star-overall' ? 'overall' : 'confidence';
+      const valueEl = document.getElementById(`rating-${key}-value`);
+      const stars = container.querySelectorAll('.star');
+
+      stars.forEach((star) => {
+        star.addEventListener('mouseenter', () => {
+          const val = parseInt(star.dataset.value);
+          stars.forEach((s) => s.classList.toggle('hovered', parseInt(s.dataset.value) <= val));
+        });
+
+        star.addEventListener('mouseleave', () => {
+          stars.forEach((s) => s.classList.remove('hovered'));
+        });
+
+        star.addEventListener('click', () => {
+          const val = parseInt(star.dataset.value);
+          this.selfRatings[key] = val;
+          stars.forEach((s) => {
+            const sv = parseInt(s.dataset.value);
+            s.classList.toggle('selected', sv <= val);
+            s.innerHTML = sv <= val ? '&#9733;' : '&#9734;';
+          });
+          if (valueEl) valueEl.textContent = `${val}/5`;
+        });
+      });
+    }
+  },
+
+  submitSelfRating() {
+    const { overall, confidence } = this.selfRatings;
+    if (overall === 0 || confidence === 0) {
+      alert('Please rate both your overall delivery and speaking confidence.');
+      return;
+    }
+
+    const feedbackEl = document.getElementById('rating-feedback');
+    const aiScore = this.state.lastAnalysis ? Math.round(this.state.lastAnalysis.overall_score) : null;
+    const selfScore = Math.round((overall / 5) * 100);
+
+    let msg = `You rated yourself ${overall}/5 overall and ${confidence}/5 confidence. `;
+    if (aiScore !== null) {
+      const diff = selfScore - aiScore;
+      if (Math.abs(diff) <= 10) {
+        msg += `Your self-assessment closely matches the AI score of ${aiScore}/100.`;
+      } else if (diff > 10) {
+        msg += `The AI scored you ${aiScore}/100 — focusing on the flagged areas could help close the gap.`;
+      } else {
+        msg += `The AI scored you ${aiScore}/100 — you may be underestimating yourself!`;
+      }
+    }
+
+    if (feedbackEl) {
+      feedbackEl.textContent = msg;
+      feedbackEl.style.color = 'var(--primary-dark)';
+    }
+
+    document.getElementById('btn-submit-rating').textContent = 'Rating Submitted';
+    document.getElementById('btn-submit-rating').disabled = true;
   },
 
   // ── Loading UI ─────────────────────────────────────────────────

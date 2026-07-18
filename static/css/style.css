@@ -549,6 +549,49 @@ body {
 .difficulty-badge.intermediate { background: #dbeafe; color: #1e40af; }
 .difficulty-badge.expert { background: #fce7f3; color: #9d174d; }
 
+/* ── Self-Rating Panel ─────────────────────────────────────────── */
+.self-rating-panel {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid #e0d4f5;
+}
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.rating-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 120px;
+}
+.star-rating {
+  display: flex;
+  gap: 0.15rem;
+}
+.star-rating .star {
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: #d0d0dd;
+  transition: color 0.15s, transform 0.1s;
+  user-select: none;
+}
+.star-rating .star:hover,
+.star-rating .star.hovered {
+  color: #f59e0b;
+  transform: scale(1.15);
+}
+.star-rating .star.selected {
+  color: #f59e0b;
+}
+.rating-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+  min-width: 30px;
+}
+
 /* ── Audience Canvas ───────────────────────────────────────────── */
 #audience-canvas {
   height: 200px;
