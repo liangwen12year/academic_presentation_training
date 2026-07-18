@@ -345,16 +345,19 @@ def analyze_recording(
         script_word_count=len(script_words),
     )
 
-    # 6. Overall score (simple heuristic)
+    # 6. Overall score
     total_words = len(script_words)
     red_count = sum(1 for f in flagged if f.flag == "red")
     yellow_count = sum(1 for f in flagged if f.flag == "yellow")
     filler_penalty = min(len(fillers) * 2, 20)
     pacing_penalty = 0 if pacing.assessment == "good" else 10
 
-    accuracy = max(0, 100 - (red_count / max(total_words, 1)) * 100 * 2)
-    clarity = max(0, 100 - (yellow_count / max(total_words, 1)) * 100)
-    overall = max(0, min(100, (accuracy * 0.5 + clarity * 0.3 + 20) - filler_penalty - pacing_penalty))
+    # Coverage: what fraction of script words were spoken correctly
+    correct_count = total_words - red_count - yellow_count
+    coverage = max(0, correct_count / max(total_words, 1))
+    # Clarity: penalize unclear words
+    clarity = max(0, 1 - (yellow_count / max(total_words, 1)))
+    overall = max(0, min(100, coverage * 80 + clarity * 20 - filler_penalty - pacing_penalty))
 
     return AnalysisResult(
         transcript=transcript,
