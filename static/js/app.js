@@ -204,8 +204,10 @@ const App = {
       refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
     }
 
-    // Clear previous analysis and recording review
+    // Clear previous analysis, rating, and recording review
     document.getElementById('analysis-results').classList.add('hidden');
+    const selfRatingPanel = document.getElementById('self-rating-panel');
+    if (selfRatingPanel) selfRatingPanel.classList.add('hidden');
     const listenBtn = document.getElementById('btn-listen-results');
     if (listenBtn) listenBtn.classList.add('hidden');
     if (window.speechSynthesis) window.speechSynthesis.cancel();
@@ -673,6 +675,25 @@ const App = {
 
   renderAnalysis(data) {
     const container = document.getElementById('analysis-results');
+
+    // Show self-rating panel first, hide analysis until rating is submitted
+    const ratingPanel = document.getElementById('self-rating-panel');
+    if (ratingPanel) {
+      ratingPanel.classList.remove('hidden');
+      this.selfRatings = { overall: 0, confidence: 0 };
+      const ratingBtn = document.getElementById('btn-submit-rating');
+      if (ratingBtn) { ratingBtn.textContent = 'Submit Rating'; ratingBtn.disabled = false; }
+      const ratingFeedback = document.getElementById('rating-feedback');
+      if (ratingFeedback) ratingFeedback.textContent = '';
+      document.querySelectorAll('.star-rating .star').forEach((s) => {
+        s.classList.remove('selected', 'hovered');
+        s.innerHTML = '&#9734;';
+      });
+      document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
+      this.initStarRatings();
+      ratingPanel.scrollIntoView({ behavior: 'smooth' });
+    }
+
     container.classList.remove('hidden');
 
     // Record session
@@ -811,19 +832,6 @@ const App = {
       const fillerCountEl = document.getElementById('rt-filler-count');
       if (fillerCountEl) fillerCountEl.textContent = data.filler_count;
     }
-
-    // Reset and init self-rating panel
-    this.selfRatings = { overall: 0, confidence: 0 };
-    const ratingBtn = document.getElementById('btn-submit-rating');
-    if (ratingBtn) { ratingBtn.textContent = 'Submit Rating'; ratingBtn.disabled = false; }
-    const ratingFeedback = document.getElementById('rating-feedback');
-    if (ratingFeedback) ratingFeedback.textContent = '';
-    document.querySelectorAll('.star-rating .star').forEach((s) => {
-      s.classList.remove('selected', 'hovered');
-      s.innerHTML = '&#9734;';
-    });
-    document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
-    this.initStarRatings();
 
     container.scrollIntoView({ behavior: 'smooth' });
   },

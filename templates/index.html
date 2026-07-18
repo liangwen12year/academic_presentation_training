@@ -67,6 +67,41 @@
             </div>
           </div>
 
+          <!-- Self-Rating Panel (above analysis so user rates before seeing AI score) -->
+          <div id="self-rating-panel" class="card self-rating-panel hidden" style="margin-top: 1rem;">
+            <div class="section-header">Your Self-Assessment</div>
+            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.75rem;">Before viewing the AI analysis, how do you think you did?</p>
+
+            <div class="rating-row">
+              <label class="rating-label">Overall Delivery</label>
+              <div class="star-rating" id="star-overall">
+                <span class="star" data-value="1">&#9734;</span>
+                <span class="star" data-value="2">&#9734;</span>
+                <span class="star" data-value="3">&#9734;</span>
+                <span class="star" data-value="4">&#9734;</span>
+                <span class="star" data-value="5">&#9734;</span>
+              </div>
+              <span class="rating-value" id="rating-overall-value"></span>
+            </div>
+
+            <div class="rating-row" style="margin-top:0.75rem;">
+              <label class="rating-label">Speaking Confidence</label>
+              <div class="star-rating" id="star-confidence">
+                <span class="star" data-value="1">&#9734;</span>
+                <span class="star" data-value="2">&#9734;</span>
+                <span class="star" data-value="3">&#9734;</span>
+                <span class="star" data-value="4">&#9734;</span>
+                <span class="star" data-value="5">&#9734;</span>
+              </div>
+              <span class="rating-value" id="rating-confidence-value"></span>
+            </div>
+
+            <button class="btn btn-primary btn-block btn-sm" style="margin-top:1rem;" id="btn-submit-rating" onclick="App.submitSelfRating()">
+              Submit Rating
+            </button>
+            <div id="rating-feedback" style="font-size:0.8rem; margin-top:0.5rem; color:var(--text-secondary);"></div>
+          </div>
+
           <!-- Analysis Results -->
           <div id="analysis-results" class="card analysis-results hidden">
             <h3 class="section-header">Analysis Results</h3>
@@ -114,41 +149,6 @@
             <div style="margin-top: 1rem;">
               <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(click to hear correct pronunciation)</span></div>
               <div id="flagged-list" class="flagged-list"></div>
-            </div>
-
-            <!-- Self-Rating Panel -->
-            <div id="self-rating-panel" class="self-rating-panel" style="margin-top: 1.5rem;">
-              <div class="section-header">Your Self-Assessment</div>
-              <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.75rem;">How do you think you did? Rate yourself and compare with the AI score.</p>
-
-              <div class="rating-row">
-                <label class="rating-label">Overall Delivery</label>
-                <div class="star-rating" id="star-overall">
-                  <span class="star" data-value="1">&#9734;</span>
-                  <span class="star" data-value="2">&#9734;</span>
-                  <span class="star" data-value="3">&#9734;</span>
-                  <span class="star" data-value="4">&#9734;</span>
-                  <span class="star" data-value="5">&#9734;</span>
-                </div>
-                <span class="rating-value" id="rating-overall-value"></span>
-              </div>
-
-              <div class="rating-row" style="margin-top:0.75rem;">
-                <label class="rating-label">Speaking Confidence</label>
-                <div class="star-rating" id="star-confidence">
-                  <span class="star" data-value="1">&#9734;</span>
-                  <span class="star" data-value="2">&#9734;</span>
-                  <span class="star" data-value="3">&#9734;</span>
-                  <span class="star" data-value="4">&#9734;</span>
-                  <span class="star" data-value="5">&#9734;</span>
-                </div>
-                <span class="rating-value" id="rating-confidence-value"></span>
-              </div>
-
-              <button class="btn btn-primary btn-block btn-sm" style="margin-top:1rem;" id="btn-submit-rating" onclick="App.submitSelfRating()">
-                Submit Rating
-              </button>
-              <div id="rating-feedback" style="font-size:0.8rem; margin-top:0.5rem; color:var(--text-secondary);"></div>
             </div>
 
           </div>
