@@ -11,12 +11,7 @@ import numpy as np
 
 from app.config import settings
 
-# Common filler words to detect
-FILLER_WORDS = {
-    "um", "uh", "uhh", "umm", "hmm", "hm", "er", "ah", "ahh",
-    "like", "you know", "basically", "actually", "literally",
-    "so", "right", "okay", "ok",
-}
+FILLER_WORDS = {"um", "uh", "uhh", "umm", "er", "ah", "ahh"}
 
 # Whisper model singleton
 _whisper_model = None

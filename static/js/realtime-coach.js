@@ -41,11 +41,7 @@ const RealtimeCoach = {
 
   // Filler detection via SpeechRecognition
   recognition: null,
-  fillerWords: new Set([
-    'um', 'uh', 'uhh', 'umm', 'hmm', 'hm', 'er', 'ah', 'ahh',
-    'like', 'basically', 'actually', 'literally',
-    'you know', 'i mean', 'sort of', 'kind of',
-  ]),
+  fillerWords: new Set(['um', 'uh', 'uhh', 'umm', 'er', 'ah', 'ahh']),
   recentFillers: [],
 
   // Session stats
