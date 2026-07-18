@@ -208,6 +208,8 @@ const App = {
     this.closeAnalysisModal();
     const listenBtn = document.getElementById('btn-listen-results');
     if (listenBtn) listenBtn.classList.add('hidden');
+    const viewBtn = document.getElementById('btn-view-results');
+    if (viewBtn) viewBtn.classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
 
     const rtFeedback = document.getElementById('realtime-feedback');
@@ -691,8 +693,10 @@ const App = {
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
 
-    // Open modal
+    // Open modal and show "View Last Results" button
     this.openAnalysisModal();
+    const viewBtn = document.getElementById('btn-view-results');
+    if (viewBtn) viewBtn.classList.remove('hidden');
 
     // Record session
     const sessionEntry = SessionTracker.recordSession({
