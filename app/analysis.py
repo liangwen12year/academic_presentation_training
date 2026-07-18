@@ -84,6 +84,9 @@ def transcribe_audio(audio_path: Path) -> tuple[str, list[WordResult], float]:
         str(audio_path),
         word_timestamps=True,
         language="en",
+        repetition_penalty=1.5,
+        no_repeat_ngram_size=4,
+        condition_on_previous_text=False,
     )
 
     words: list[WordResult] = []
@@ -106,7 +109,35 @@ def transcribe_audio(audio_path: Path) -> tuple[str, list[WordResult], float]:
                     )
                 )
 
-    return " ".join(full_text_parts), words, duration
+    full_text = " ".join(full_text_parts)
+    full_text, words = _deduplicate_transcript(full_text, words)
+
+    return full_text, words, duration
+
+
+def _deduplicate_transcript(text: str, words: list[WordResult]) -> tuple[str, list[WordResult]]:
+    """Remove repeated segments from Whisper output."""
+    text_words = text.split()
+    n = len(text_words)
+    if n < 6:
+        return text, words
+
+    # Find the longest suffix of the text that matches a prefix
+    best = 0
+    half = n // 2
+    for length in range(3, half + 1):
+        suffix = text_words[n - length:]
+        prefix = text_words[:length]
+        if suffix == prefix:
+            best = length
+
+    if best >= 3:
+        trimmed = text_words[: n - best]
+        text = " ".join(trimmed)
+        if words:
+            words = words[: len(trimmed)]
+
+    return text, words
 
 
 def _normalize(text: str) -> str:
