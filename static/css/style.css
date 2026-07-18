@@ -592,6 +592,55 @@ body {
   min-width: 30px;
 }
 
+/* ── Analysis Modal ────────────────────────────────────────────── */
+.analysis-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.analysis-modal-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.analysis-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+  width: 90%;
+  max-width: 680px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 2rem;
+  position: relative;
+  transform: translateY(20px);
+  transition: transform 0.25s;
+}
+.analysis-modal-overlay.visible .analysis-modal {
+  transform: translateY(0);
+}
+.analysis-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  line-height: 1;
+  padding: 0.25rem;
+}
+.analysis-modal-close:hover {
+  color: var(--text);
+}
+
 /* ── Audience Canvas ───────────────────────────────────────────── */
 #audience-canvas {
   height: 200px;

@@ -56,102 +56,6 @@
             <textarea id="script-text" placeholder="Script will appear here after upload..."></textarea>
           </div>
 
-          <!-- Recording Playback & Transcript -->
-          <div id="recording-review" class="card hidden" style="margin-top: 1rem;">
-            <div class="section-header">Your Recording</div>
-            <div id="recording-playback"></div>
-
-            <div style="margin-top: 1rem;">
-              <div class="section-header">Your Transcript</div>
-              <div id="transcript-text" class="transcript"></div>
-            </div>
-          </div>
-
-          <!-- Self-Rating Panel (above analysis so user rates before seeing AI score) -->
-          <div id="self-rating-panel" class="card self-rating-panel hidden" style="margin-top: 1rem;">
-            <div class="section-header">Your Self-Assessment</div>
-            <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.75rem;">Before viewing the AI analysis, how do you think you did?</p>
-
-            <div class="rating-row">
-              <label class="rating-label">Overall Delivery</label>
-              <div class="star-rating" id="star-overall">
-                <span class="star" data-value="1">&#9734;</span>
-                <span class="star" data-value="2">&#9734;</span>
-                <span class="star" data-value="3">&#9734;</span>
-                <span class="star" data-value="4">&#9734;</span>
-                <span class="star" data-value="5">&#9734;</span>
-              </div>
-              <span class="rating-value" id="rating-overall-value"></span>
-            </div>
-
-            <div class="rating-row" style="margin-top:0.75rem;">
-              <label class="rating-label">Speaking Confidence</label>
-              <div class="star-rating" id="star-confidence">
-                <span class="star" data-value="1">&#9734;</span>
-                <span class="star" data-value="2">&#9734;</span>
-                <span class="star" data-value="3">&#9734;</span>
-                <span class="star" data-value="4">&#9734;</span>
-                <span class="star" data-value="5">&#9734;</span>
-              </div>
-              <span class="rating-value" id="rating-confidence-value"></span>
-            </div>
-
-            <button class="btn btn-primary btn-block btn-sm" style="margin-top:1rem;" id="btn-submit-rating" onclick="App.submitSelfRating()">
-              Submit Rating
-            </button>
-            <div id="rating-feedback" style="font-size:0.8rem; margin-top:0.5rem; color:var(--text-secondary);"></div>
-          </div>
-
-          <!-- Analysis Results -->
-          <div id="analysis-results" class="card analysis-results hidden">
-            <h3 class="section-header">Analysis Results</h3>
-
-            <!-- Coach Message -->
-            <div id="coach-message" class="coach-message hidden"></div>
-            <button id="btn-listen-results" class="btn btn-outline btn-sm hidden" style="margin-bottom:1rem;" onclick="App.listenToResults()">
-              🔊 Listen to Results
-            </button>
-
-            <div style="text-align:center; margin: 1rem 0;">
-              <div style="font-weight:700;"><span id="overall-score" style="font-size:3rem;">--</span><span style="font-size:1.4rem; color:var(--text-secondary);"> / 100</span></div>
-              <div style="font-size:0.8rem; color:var(--text-secondary);">Overall Score</div>
-            </div>
-
-            <div class="metrics-grid">
-              <div class="metric-card">
-                <div class="metric-value" id="metric-wpm">--</div>
-                <div class="metric-label">Words/min</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-value" id="metric-fillers">--</div>
-                <div class="metric-label">Filler Words</div>
-              </div>
-              <div class="metric-card">
-                <div class="metric-value" id="metric-duration">--</div>
-                <div class="metric-label">Duration</div>
-              </div>
-            </div>
-
-            <!-- Pacing -->
-            <div style="margin-top: 1rem;">
-              <div class="section-header">Pacing</div>
-              <p id="pacing-detail" style="font-size:0.85rem; margin-top:0.5rem;"></p>
-              <span id="pacing-badge" class="filler-tag" style="margin-top:0.25rem;display:inline-block;"></span>
-            </div>
-
-            <!-- Filler Words -->
-            <div style="margin-top: 1rem;">
-              <div class="section-header">Filler Words</div>
-              <div id="filler-list" class="filler-summary"></div>
-            </div>
-
-            <!-- Flagged Words -->
-            <div style="margin-top: 1rem;">
-              <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(click to hear correct pronunciation)</span></div>
-              <div id="flagged-list" class="flagged-list"></div>
-            </div>
-
-          </div>
         </div>
 
         <!-- Sidebar -->
@@ -263,6 +167,95 @@
     <div class="loading-box">
       <div class="spinner"></div>
       <p>Processing...</p>
+    </div>
+  </div>
+
+  <!-- Analysis Results Modal -->
+  <div id="analysis-modal-overlay" class="analysis-modal-overlay" onclick="App.closeAnalysisModal(event)">
+    <div class="analysis-modal">
+      <button class="analysis-modal-close" onclick="App.closeAnalysisModal()">&times;</button>
+
+      <!-- Recording Playback & Transcript -->
+      <div id="recording-review">
+        <div class="section-header">Your Recording</div>
+        <div id="recording-playback"></div>
+        <div style="margin-top: 1rem;">
+          <div class="section-header">Your Transcript</div>
+          <div id="transcript-text" class="transcript"></div>
+        </div>
+      </div>
+
+      <!-- Self-Rating Panel -->
+      <div id="self-rating-panel" class="self-rating-panel" style="margin-top: 1.5rem;">
+        <div class="section-header">Your Self-Assessment</div>
+        <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:0.75rem;">Before viewing the AI analysis, how do you think you did?</p>
+        <div class="rating-row">
+          <label class="rating-label">Overall Delivery</label>
+          <div class="star-rating" id="star-overall">
+            <span class="star" data-value="1">&#9734;</span>
+            <span class="star" data-value="2">&#9734;</span>
+            <span class="star" data-value="3">&#9734;</span>
+            <span class="star" data-value="4">&#9734;</span>
+            <span class="star" data-value="5">&#9734;</span>
+          </div>
+          <span class="rating-value" id="rating-overall-value"></span>
+        </div>
+        <div class="rating-row" style="margin-top:0.75rem;">
+          <label class="rating-label">Speaking Confidence</label>
+          <div class="star-rating" id="star-confidence">
+            <span class="star" data-value="1">&#9734;</span>
+            <span class="star" data-value="2">&#9734;</span>
+            <span class="star" data-value="3">&#9734;</span>
+            <span class="star" data-value="4">&#9734;</span>
+            <span class="star" data-value="5">&#9734;</span>
+          </div>
+          <span class="rating-value" id="rating-confidence-value"></span>
+        </div>
+        <button class="btn btn-primary btn-block btn-sm" style="margin-top:1rem;" id="btn-submit-rating" onclick="App.submitSelfRating()">
+          Submit Rating
+        </button>
+        <div id="rating-feedback" style="font-size:0.8rem; margin-top:0.5rem; color:var(--text-secondary);"></div>
+      </div>
+
+      <!-- Analysis Results -->
+      <div id="analysis-results" style="margin-top: 1.5rem;">
+        <h3 class="section-header">Analysis Results</h3>
+        <div id="coach-message" class="coach-message hidden"></div>
+        <button id="btn-listen-results" class="btn btn-outline btn-sm hidden" style="margin-bottom:1rem;" onclick="App.listenToResults()">
+          🔊 Listen to Results
+        </button>
+        <div style="text-align:center; margin: 1rem 0;">
+          <div style="font-weight:700;"><span id="overall-score" style="font-size:3rem;">--</span><span style="font-size:1.4rem; color:var(--text-secondary);"> / 100</span></div>
+          <div style="font-size:0.8rem; color:var(--text-secondary);">Overall Score</div>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-value" id="metric-wpm">--</div>
+            <div class="metric-label">Words/min</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value" id="metric-fillers">--</div>
+            <div class="metric-label">Filler Words</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value" id="metric-duration">--</div>
+            <div class="metric-label">Duration</div>
+          </div>
+        </div>
+        <div style="margin-top: 1rem;">
+          <div class="section-header">Pacing</div>
+          <p id="pacing-detail" style="font-size:0.85rem; margin-top:0.5rem;"></p>
+          <span id="pacing-badge" class="filler-tag" style="margin-top:0.25rem;display:inline-block;"></span>
+        </div>
+        <div style="margin-top: 1rem;">
+          <div class="section-header">Filler Words</div>
+          <div id="filler-list" class="filler-summary"></div>
+        </div>
+        <div style="margin-top: 1rem;">
+          <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(click to hear correct pronunciation)</span></div>
+          <div id="flagged-list" class="flagged-list"></div>
+        </div>
+      </div>
     </div>
   </div>
 
