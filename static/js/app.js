@@ -693,6 +693,10 @@ const App = {
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
 
+    // Populate script in modal
+    const modalScript = document.getElementById('modal-script-text');
+    if (modalScript) modalScript.textContent = this.state.slides[this.state.currentSlide].script;
+
     // Open modal and show "View Last Results" button
     this.openAnalysisModal();
     const viewBtn = document.getElementById('btn-view-results');
