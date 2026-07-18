@@ -34,7 +34,7 @@ const RealtimeCoach = {
   paceWindowMs: 10000,  // 10s rolling window
   lastPeakTime: 0,
   wasPeak: false,
-  peakThreshold: 0.06,
+  peakThreshold: 0.03,
 
   // Energy smoothing
   smoothEnergy: 0,
