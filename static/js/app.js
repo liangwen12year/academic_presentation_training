@@ -696,13 +696,21 @@ const App = {
       this._analysisError = err.message;
     }
 
+    // Analysis done -- render results and show right panel regardless of rating
+    if (this._pendingAnalysis) {
+      this.renderAnalysis(this._pendingAnalysis);
+      this.showResultsColumn();
+    }
+
     // Update status in rating modal
     const statusEl = document.getElementById('rating-analysis-status');
     if (statusEl) {
       if (this._pendingAnalysis) {
-        statusEl.innerHTML = '<span style="color:var(--success);">Analysis complete. Submit your rating to view results.</span>';
+        statusEl.innerHTML = '<span style="color:var(--success);">Analysis complete. Results are now visible.</span>';
       } else if (this._analysisError) {
         statusEl.innerHTML = '<span style="color:var(--danger);">Analysis failed.</span>';
+        this.closeRatingModal();
+        alert('Analysis failed: ' + this._analysisError);
       }
     }
   },
@@ -1067,27 +1075,6 @@ const App = {
       alert('Please rate both your overall delivery and speaking confidence.');
       return;
     }
-
-    const btn = document.getElementById('btn-submit-rating');
-
-    // Wait for analysis if still running
-    if (!this._pendingAnalysis && !this._analysisError) {
-      btn.textContent = 'Waiting for analysis...';
-      btn.disabled = true;
-      while (!this._pendingAnalysis && !this._analysisError) {
-        await new Promise((r) => setTimeout(r, 300));
-      }
-    }
-
-    if (this._analysisError) {
-      this.closeRatingModal();
-      alert('Analysis failed: ' + this._analysisError);
-      this.updateAvatarState('idle');
-      return;
-    }
-
-    // Render analysis results
-    this.renderAnalysis(this._pendingAnalysis);
 
     // Save to backend
     const aiScore = this.state.lastAnalysis ? Math.round(this.state.lastAnalysis.overall_score) : null;
