@@ -695,6 +695,16 @@ const App = {
     } catch (err) {
       this._analysisError = err.message;
     }
+
+    // Update status in rating modal
+    const statusEl = document.getElementById('rating-analysis-status');
+    if (statusEl) {
+      if (this._pendingAnalysis) {
+        statusEl.innerHTML = '<span style="color:var(--success);">Analysis complete. Submit your rating to view results.</span>';
+      } else if (this._analysisError) {
+        statusEl.innerHTML = '<span style="color:var(--danger);">Analysis failed.</span>';
+      }
+    }
   },
 
   // ── Render Analysis Results ────────────────────────────────────

@@ -228,7 +228,11 @@
 
       <div id="self-rating-panel" class="self-rating-panel">
         <div class="section-header">Your Self-Assessment</div>
-        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Before viewing the AI analysis, how do you think you did?</p>
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Rate yourself while the AI analyzes your recording.</p>
+        <div id="rating-analysis-status" style="font-size:0.8rem; color:var(--primary); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+          <span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+          <span>Analyzing recording...</span>
+        </div>
         <div class="rating-row">
           <label class="rating-label">Overall Delivery</label>
           <div class="star-rating" id="star-overall">
