@@ -204,12 +204,10 @@ const App = {
       refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
     }
 
-    // Close analysis modal and reset
-    this.closeAnalysisModal();
+    // Hide results column
+    this.hideResultsColumn();
     const listenBtn = document.getElementById('btn-listen-results');
     if (listenBtn) listenBtn.classList.add('hidden');
-    const viewBtn = document.getElementById('btn-view-results');
-    if (viewBtn) viewBtn.classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
 
     const rtFeedback = document.getElementById('realtime-feedback');
@@ -251,15 +249,14 @@ const App = {
     });
   },
 
-  // ── Analysis Modal ────────────────────────────────────────────
+  // ── Results Column ────────────────────────────────────────────
 
-  openAnalysisModal() {
-    document.getElementById('analysis-modal-overlay').classList.add('visible');
+  showResultsColumn() {
+    document.getElementById('results-column').classList.remove('hidden');
   },
 
-  closeAnalysisModal(event) {
-    if (event && event.target !== event.currentTarget) return;
-    document.getElementById('analysis-modal-overlay').classList.remove('visible');
+  hideResultsColumn() {
+    document.getElementById('results-column').classList.add('hidden');
   },
 
   // ── Session Expiry Handling ────────────────────────────────────
@@ -693,14 +690,8 @@ const App = {
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
 
-    // Populate script in modal
-    const modalScript = document.getElementById('modal-script-text');
-    if (modalScript) modalScript.textContent = this.state.slides[this.state.currentSlide].script;
-
-    // Open modal and show "View Last Results" button
-    this.openAnalysisModal();
-    const viewBtn = document.getElementById('btn-view-results');
-    if (viewBtn) viewBtn.classList.remove('hidden');
+    // Show results column
+    this.showResultsColumn();
 
     // Record session
     const sessionEntry = SessionTracker.recordSession({

@@ -75,7 +75,7 @@ body {
 }
 
 /* Layout */
-.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
+.container { max-width: 1800px; margin: 0 auto; padding: 1.5rem; }
 
 /* Upload area */
 .upload-area {
@@ -102,15 +102,20 @@ body {
   padding: 1.5rem;
 }
 
-/* Practice layout */
+/* Practice layout — three columns */
 .practice-layout {
   display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: 1.5rem;
+  grid-template-columns: 1fr 360px;
+  gap: 1.25rem;
   margin-top: 1rem;
 }
-@media (max-width: 900px) {
-  .practice-layout { grid-template-columns: 1fr; }
+.practice-layout:has(#results-column:not(.hidden)) {
+  grid-template-columns: 1fr 340px 400px;
+}
+@media (max-width: 1200px) {
+  .practice-layout, .practice-layout:has(#results-column:not(.hidden)) {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Slide viewer */
