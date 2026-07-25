@@ -657,40 +657,11 @@ const App = {
     if (!this.state.audioChunks.length) return;
 
     await this.saveScript();
-    this.showLoading('Analyzing your recording...');
-    this.updateAvatarState('thinking');
 
-    const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
-    const form = new FormData();
-    form.append('presentation_id', this.state.presentationId);
-    form.append('slide_index', this.state.currentSlide);
-    form.append('audio', blob, 'recording.webm');
-    form.append('coach_mode', this.state.coachMode);
-
-    try {
-      const res = await fetch('/api/analyze', { method: 'POST', body: form });
-      if (!res.ok) {
-        const errText = await res.text();
-        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
-        throw new Error(errText);
-      }
-      const data = await res.json();
-      this.renderAnalysis(data);
-    } catch (err) {
-      alert('Analysis failed: ' + err.message);
-      this.updateAvatarState('idle');
-    } finally {
-      this.hideLoading();
-    }
-  },
-
-  // ── Render Analysis Results ────────────────────────────────────
-
-  renderAnalysis(data) {
-    // Reset self-rating
+    // Show self-assessment immediately while analysis runs
     this.selfRatings = { overall: 0, confidence: 0 };
     const ratingBtn = document.getElementById('btn-submit-rating');
-    if (ratingBtn) { ratingBtn.textContent = 'Submit Rating'; ratingBtn.disabled = false; }
+    if (ratingBtn) { ratingBtn.textContent = 'Submit & View Results'; ratingBtn.disabled = false; }
     const ratingFeedback = document.getElementById('rating-feedback');
     if (ratingFeedback) ratingFeedback.textContent = '';
     document.querySelectorAll('.star-rating .star').forEach((s) => {
@@ -699,9 +670,36 @@ const App = {
     });
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
-
-    // Show self-assessment modal first (results column shown after rating)
     this.openRatingModal();
+
+    // Run analysis in background
+    this.updateAvatarState('thinking');
+    const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('slide_index', this.state.currentSlide);
+    form.append('audio', blob, 'recording.webm');
+    form.append('coach_mode', this.state.coachMode);
+
+    this._pendingAnalysis = null;
+    this._analysisError = null;
+
+    try {
+      const res = await fetch('/api/analyze', { method: 'POST', body: form });
+      if (!res.ok) {
+        const errText = await res.text();
+        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
+        throw new Error(errText);
+      }
+      this._pendingAnalysis = await res.json();
+    } catch (err) {
+      this._analysisError = err.message;
+    }
+  },
+
+  // ── Render Analysis Results ────────────────────────────────────
+
+  renderAnalysis(data) {
 
     // Record session
     const sessionEntry = SessionTracker.recordSession({
@@ -1060,11 +1058,29 @@ const App = {
       return;
     }
 
-    const feedbackEl = document.getElementById('rating-feedback');
-    const aiScore = this.state.lastAnalysis ? Math.round(this.state.lastAnalysis.overall_score) : null;
-    const selfScore = Math.round((overall / 5) * 100);
+    const btn = document.getElementById('btn-submit-rating');
+
+    // Wait for analysis if still running
+    if (!this._pendingAnalysis && !this._analysisError) {
+      btn.textContent = 'Waiting for analysis...';
+      btn.disabled = true;
+      while (!this._pendingAnalysis && !this._analysisError) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+
+    if (this._analysisError) {
+      this.closeRatingModal();
+      alert('Analysis failed: ' + this._analysisError);
+      this.updateAvatarState('idle');
+      return;
+    }
+
+    // Render analysis results
+    this.renderAnalysis(this._pendingAnalysis);
 
     // Save to backend
+    const aiScore = this.state.lastAnalysis ? Math.round(this.state.lastAnalysis.overall_score) : null;
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('slide_index', this.state.currentSlide);
@@ -1076,23 +1092,6 @@ const App = {
       await fetch('/api/self-rating', { method: 'POST', body: form });
     } catch (err) {
       console.warn('Failed to save rating:', err);
-    }
-
-    let msg = `You rated yourself ${overall}/5 overall and ${confidence}/5 confidence. `;
-    if (aiScore !== null) {
-      const diff = selfScore - aiScore;
-      if (Math.abs(diff) <= 10) {
-        msg += `Your self-assessment closely matches the AI score of ${aiScore}/100.`;
-      } else if (diff > 10) {
-        msg += `The AI scored you ${aiScore}/100 — focusing on the flagged areas could help close the gap.`;
-      } else {
-        msg += `The AI scored you ${aiScore}/100 — you may be underestimating yourself!`;
-      }
-    }
-
-    if (feedbackEl) {
-      feedbackEl.textContent = msg;
-      feedbackEl.style.color = 'var(--primary-dark)';
     }
 
     // Close modal and show results column
