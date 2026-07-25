@@ -204,8 +204,9 @@ const App = {
       refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
     }
 
-    // Hide results column
+    // Hide results column and close rating modal
     this.hideResultsColumn();
+    this.closeRatingModal();
     const listenBtn = document.getElementById('btn-listen-results');
     if (listenBtn) listenBtn.classList.add('hidden');
     document.getElementById('recording-status').textContent = 'Ready to record';
@@ -249,7 +250,7 @@ const App = {
     });
   },
 
-  // ── Results Column ────────────────────────────────────────────
+  // ── Results Column & Rating Modal ──────────────────────────────
 
   showResultsColumn() {
     document.getElementById('results-column').classList.remove('hidden');
@@ -257,6 +258,15 @@ const App = {
 
   hideResultsColumn() {
     document.getElementById('results-column').classList.add('hidden');
+  },
+
+  openRatingModal() {
+    document.getElementById('rating-modal-overlay').classList.add('visible');
+  },
+
+  closeRatingModal(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('rating-modal-overlay').classList.remove('visible');
   },
 
   // ── Session Expiry Handling ────────────────────────────────────
@@ -690,8 +700,8 @@ const App = {
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
 
-    // Show results column
-    this.showResultsColumn();
+    // Show self-assessment modal first (results column shown after rating)
+    this.openRatingModal();
 
     // Record session
     const sessionEntry = SessionTracker.recordSession({
@@ -1085,8 +1095,9 @@ const App = {
       feedbackEl.style.color = 'var(--primary-dark)';
     }
 
-    document.getElementById('btn-submit-rating').textContent = 'Rating Submitted';
-    document.getElementById('btn-submit-rating').disabled = true;
+    // Close modal and show results column
+    this.closeRatingModal();
+    this.showResultsColumn();
   },
 
   // ── Loading UI ─────────────────────────────────────────────────
