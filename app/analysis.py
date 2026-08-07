@@ -69,7 +69,7 @@ class AnalysisResult:
     overall_score: float  # 0-100
 
 
-def transcribe_audio(audio_path: Path) -> tuple[str, list[WordResult], float]:
+def transcribe_audio(audio_path: Path, script: str = "") -> tuple[str, list[WordResult], float]:
     """Transcribe audio using faster-whisper with word-level timestamps.
 
     Returns (full_text, word_results, duration_seconds).
@@ -79,6 +79,7 @@ def transcribe_audio(audio_path: Path) -> tuple[str, list[WordResult], float]:
         str(audio_path),
         word_timestamps=True,
         language="en",
+        initial_prompt=script if script else None,
         repetition_penalty=1.5,
         no_repeat_ngram_size=4,
         condition_on_previous_text=False,
@@ -273,7 +274,7 @@ def analyze_recording(
 ) -> AnalysisResult:
     """Full analysis pipeline: transcribe, align, score, detect fillers."""
     # 1. Transcribe
-    transcript, word_results, duration = transcribe_audio(audio_path)
+    transcript, word_results, duration = transcribe_audio(audio_path, script=script)
 
     # 2. Align with script
     script_words = script.split()
