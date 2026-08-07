@@ -719,12 +719,12 @@ const App = {
     }
 
     // Update status in rating modal
-    const statusEl = document.getElementById('rating-analysis-status');
-    if (statusEl) {
+    const statusEl2 = document.getElementById('rating-analysis-status');
+    if (statusEl2) {
       if (this._pendingAnalysis) {
-        statusEl.innerHTML = '<span style="color:var(--success);">Analysis complete. Results are now visible.</span>';
+        statusEl2.innerHTML = '<span style="color:var(--success);">Analysis complete. Results are now visible.</span>';
       } else if (this._analysisError) {
-        statusEl.innerHTML = '<span style="color:var(--danger);">Analysis failed.</span>';
+        statusEl2.innerHTML = '<span style="color:var(--danger);">Analysis failed.</span>';
         this.closeRatingModal();
         alert('Analysis failed: ' + this._analysisError);
       }
