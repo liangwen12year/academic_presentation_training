@@ -1082,11 +1082,17 @@ const App = {
   },
 
   async submitSelfRating() {
+    const btn = document.getElementById('btn-submit-rating');
+    if (btn.disabled) return;
+
     const { overall, confidence } = this.selfRatings;
     if (overall === 0 || confidence === 0) {
       alert('Please rate both your overall delivery and speaking confidence.');
       return;
     }
+
+    btn.textContent = 'Submitted';
+    btn.disabled = true;
 
     // Save to backend
     const aiScore = this.state.lastAnalysis ? Math.round(this.state.lastAnalysis.overall_score) : null;
