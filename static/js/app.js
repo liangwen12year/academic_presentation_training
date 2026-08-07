@@ -695,6 +695,10 @@ const App = {
 
     this._pendingAnalysis = null;
     this._analysisError = null;
+    const statusEl = document.getElementById('rating-analysis-status');
+    if (statusEl) {
+      statusEl.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span><span>Analyzing recording...</span>';
+    }
 
     try {
       const res = await fetch('/api/analyze', { method: 'POST', body: form });
