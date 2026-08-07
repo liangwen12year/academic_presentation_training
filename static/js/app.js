@@ -475,11 +475,17 @@ const App = {
 
   async startRecording() {
     try {
+      // Close previous AudioContext if any
+      if (this.state.audioCtx) {
+        try { this.state.audioCtx.close(); } catch (e) { /* ignore */ }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.state.stream = stream;
 
       // Set up analyser for waveform
       const audioCtx = new AudioContext();
+      this.state.audioCtx = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 256;
@@ -489,8 +495,10 @@ const App = {
       // Media recorder
       const recorder = new MediaRecorder(stream);
       this.state.audioChunks = [];
-      recorder.ondataavailable = (e) => this.state.audioChunks.push(e.data);
-      recorder.start();
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) this.state.audioChunks.push(e.data);
+      };
+      recorder.start(1000);
       this.state.mediaRecorder = recorder;
       this.state.isRecording = true;
 
@@ -513,6 +521,10 @@ const App = {
     if (this.state.mediaRecorder) {
       this.state.mediaRecorder.stop();
       this.state.stream.getTracks().forEach((t) => t.stop());
+    }
+    if (this.state.audioCtx) {
+      try { this.state.audioCtx.close(); } catch (e) { /* ignore */ }
+      this.state.audioCtx = null;
     }
     this.state.isRecording = false;
     cancelAnimationFrame(this.state.animFrameId);
