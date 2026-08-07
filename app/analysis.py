@@ -314,8 +314,14 @@ def analyze_recording(
 
     # 3. Flag mispronunciations and unclear words
     flagged: list[FlaggedWord] = []
+    # Skip flagging common short words that alignment often mismatches
+    skip_words = {"a", "an", "the", "to", "of", "in", "is", "it", "and", "or", "on", "at", "by", "for", "as"}
     for expected, spoken in alignment:
+        expected_norm = _normalize(expected)
+
         if spoken is None:
+            if expected_norm in skip_words or len(expected_norm) <= 2:
+                continue
             flagged.append(FlaggedWord(
                 word=expected,
                 spoken="(skipped)",
@@ -326,12 +332,11 @@ def analyze_recording(
             ))
             continue
 
-        expected_norm = _normalize(expected)
         spoken_norm = _normalize(spoken.word)
 
         if expected_norm == spoken_norm:
-            # Correct word — check confidence for clarity
-            if spoken.confidence < 0.80:
+            # Correct word — only flag very low confidence
+            if spoken.confidence < 0.50:
                 flagged.append(FlaggedWord(
                     word=expected,
                     spoken=spoken.word,
@@ -339,23 +344,17 @@ def analyze_recording(
                     end=spoken.end,
                     confidence=spoken.confidence,
                     flag="yellow",
-                    reason=f"Low confidence ({spoken.confidence:.0%}) — word may be slurred or unclear.",
+                    reason=f"Low confidence ({spoken.confidence:.0%}) — word may be unclear.",
                 ))
         else:
+            if expected_norm in skip_words or len(expected_norm) <= 2:
+                continue
             # Different word recognized
             edit_dist = _levenshtein_distance(expected_norm, spoken_norm)
             similarity = 1 - (edit_dist / max(len(expected_norm), len(spoken_norm), 1))
 
-            if similarity > 0.6:
-                flagged.append(FlaggedWord(
-                    word=expected,
-                    spoken=spoken.word,
-                    start=spoken.start,
-                    end=spoken.end,
-                    confidence=spoken.confidence,
-                    flag="yellow",
-                    reason=f"Recognized as '{spoken.word}' — may be mispronounced or unclear.",
-                ))
+            if similarity > 0.7:
+                continue
             else:
                 flagged.append(FlaggedWord(
                     word=expected,
