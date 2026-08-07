@@ -69,17 +69,49 @@ class AnalysisResult:
     overall_score: float  # 0-100
 
 
+COMMON_WORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "to", "of", "in",
+    "for", "on", "with", "at", "by", "from", "as", "into", "through",
+    "during", "before", "after", "above", "below", "between", "under",
+    "and", "but", "or", "nor", "not", "so", "yet", "both", "either",
+    "neither", "each", "every", "all", "any", "few", "more", "most",
+    "other", "some", "such", "no", "only", "own", "same", "than", "too",
+    "very", "just", "also", "that", "this", "these", "those", "it", "its",
+    "we", "our", "they", "their", "them", "he", "she", "his", "her",
+    "i", "me", "my", "you", "your", "who", "which", "what", "where",
+    "when", "how", "why", "if", "then", "there", "here", "about", "up",
+}
+
+
+def _extract_vocab_hint(script: str) -> str | None:
+    """Extract unique/technical words from script as a vocabulary hint for Whisper."""
+    words = script.split()
+    unique = []
+    seen = set()
+    for w in words:
+        clean = w.strip(".,;:!?\"'()-").lower()
+        if clean and clean not in COMMON_WORDS and clean not in seen:
+            seen.add(clean)
+            unique.append(w.strip(".,;:!?\"'()-"))
+    if not unique:
+        return None
+    return "Vocabulary: " + ", ".join(unique) + "."
+
+
 def transcribe_audio(audio_path: Path, script: str = "") -> tuple[str, list[WordResult], float]:
     """Transcribe audio using faster-whisper with word-level timestamps.
 
     Returns (full_text, word_results, duration_seconds).
     """
     model = _get_whisper_model()
+    vocab_hint = _extract_vocab_hint(script) if script else None
     segments, info = model.transcribe(
         str(audio_path),
         word_timestamps=True,
         language="en",
-        initial_prompt=script if script else None,
+        initial_prompt=vocab_hint,
         repetition_penalty=1.5,
         no_repeat_ngram_size=4,
         condition_on_previous_text=False,
