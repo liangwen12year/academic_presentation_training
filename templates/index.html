@@ -215,9 +215,19 @@
 
   <!-- Loading Overlay -->
   <div id="loading-overlay" class="loading-overlay hidden">
-    <div class="loading-box">
+    <div class="loading-box" role="status" aria-live="polite">
       <div class="spinner"></div>
-      <p>Processing...</p>
+      <p id="loading-message">Processing...</p>
+      <div id="loading-progress" class="loading-progress hidden">
+        <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="loading-progress-bar" class="progress-bar"></div>
+        </div>
+        <div class="loading-progress-details">
+          <span id="loading-progress-percent">0%</span>
+          <span id="loading-elapsed">Elapsed: 0:00</span>
+        </div>
+        <div id="loading-remaining" class="loading-remaining">Estimating time remaining...</div>
+      </div>
     </div>
   </div>
 

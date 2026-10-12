@@ -130,7 +130,8 @@ training/
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/` | Serve the SPA |
-| POST | `/api/upload` | Upload and parse PPTX |
+| POST | `/api/upload` | Start PPTX/PDF processing and return an upload job ID |
+| GET | `/api/upload/{job_id}` | Get upload-processing progress and completed slide data |
 | POST | `/api/generate-reference` | Generate reference audio for one slide |
 | POST | `/api/generate-all-references` | Generate reference audio for all slides |
 | POST | `/api/analyze` | Submit recording for analysis |
