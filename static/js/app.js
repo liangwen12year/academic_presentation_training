@@ -130,14 +130,15 @@ const App = {
       return;
     }
 
-    this.showLoading('Processing presentation...');
+    this.showUploadProgress();
     const form = new FormData();
     form.append('file', file);
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: form });
       if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+      const { job_id: jobId } = await res.json();
+      const data = await this.waitForUpload(jobId);
 
       this.state.presentationId = data.presentation_id;
       this.state.slides = data.slides;
@@ -151,6 +152,20 @@ const App = {
       alert('Upload failed: ' + err.message);
     } finally {
       this.hideLoading();
+    }
+  },
+
+  async waitForUpload(jobId) {
+    while (true) {
+      const res = await fetch(`/api/upload/${jobId}`);
+      if (!res.ok) throw new Error(await res.text());
+      const job = await res.json();
+      this.updateUploadProgress(job.progress, job.message, job.completed, job.total);
+
+      if (job.status === 'completed') return job.presentation;
+      if (job.status === 'failed') throw new Error(job.error || job.message);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   },
 
@@ -1122,11 +1137,52 @@ const App = {
 
   showLoading(msg) {
     const el = document.getElementById('loading-overlay');
-    el.querySelector('p').textContent = msg;
+    document.getElementById('loading-message').textContent = msg;
+    document.getElementById('loading-progress').classList.add('hidden');
     el.classList.remove('hidden');
   },
 
+  showUploadProgress() {
+    const el = document.getElementById('loading-overlay');
+    document.getElementById('loading-progress').classList.remove('hidden');
+    document.getElementById('loading-remaining').textContent = 'Estimating time remaining...';
+    this.updateUploadProgress(0, 'Uploading presentation...');
+    this.uploadStartedAt = Date.now();
+    this.uploadElapsedTimer = setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - this.uploadStartedAt) / 1000);
+      const minutes = Math.floor(elapsedSeconds / 60);
+      const seconds = String(elapsedSeconds % 60).padStart(2, '0');
+      document.getElementById('loading-elapsed').textContent = `Elapsed: ${minutes}:${seconds}`;
+    }, 1000);
+    el.classList.remove('hidden');
+  },
+
+  updateUploadProgress(progress, message, completed = 0, total = 0) {
+    const percent = Math.max(0, Math.min(100, progress || 0));
+    document.getElementById('loading-message').textContent = message;
+    document.getElementById('loading-progress-bar').style.width = `${percent}%`;
+    document.getElementById('loading-progress-percent').textContent = `${percent}%`;
+    document.querySelector('.progress-track').setAttribute('aria-valuenow', percent);
+
+    if (completed > 0 && total > 0 && this.uploadStartedAt) {
+      const elapsedSeconds = (Date.now() - this.uploadStartedAt) / 1000;
+      const remainingSeconds = Math.ceil((elapsedSeconds / completed) * (total - completed));
+      document.getElementById('loading-remaining').textContent =
+        remainingSeconds > 0
+          ? `Estimated remaining: about ${this.formatDuration(remainingSeconds)}`
+          : 'Finishing up...';
+    }
+  },
+
+  formatDuration(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  },
+
   hideLoading() {
+    clearInterval(this.uploadElapsedTimer);
+    this.uploadElapsedTimer = null;
     document.getElementById('loading-overlay').classList.add('hidden');
   },
 };

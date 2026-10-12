@@ -8,6 +8,7 @@ import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from PIL import Image
 from pptx import Presentation
@@ -261,7 +262,10 @@ async def generate_script_from_slide(slide_text: str, slide_index: int) -> str:
         return fallback
 
 
-async def ingest_pdf(filepath: Path) -> PresentationData:
+async def ingest_pdf(
+    filepath: Path,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> PresentationData:
     """Parse a PDF file and return structured slide data."""
     pres_id = uuid.uuid4().hex[:12]
     out_dir = settings.slides_dir / pres_id
@@ -326,14 +330,22 @@ async def ingest_pdf(filepath: Path) -> PresentationData:
                 script=script,
             )
         )
+        if progress_callback:
+            progress_callback(idx + 1, len(image_paths), f"Processing slide {idx + 1} of {len(image_paths)}")
 
     return PresentationData(id=pres_id, filename=filepath.name, slides=slides)
 
 
-async def ingest_pptx(filepath: Path) -> PresentationData:
+async def ingest_pptx(
+    filepath: Path,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+) -> PresentationData:
     """Parse a PPTX file and return structured slide data."""
     pres_id = uuid.uuid4().hex[:12]
     prs = Presentation(str(filepath))
+    total_slides = len(prs.slides)
+    if progress_callback:
+        progress_callback(0, total_slides, "Rendering slide images")
 
     # Try LibreOffice rendering for full-fidelity slide images
     lo_paths = _render_slides_with_libreoffice(filepath, pres_id)
@@ -366,5 +378,7 @@ async def ingest_pptx(filepath: Path) -> PresentationData:
                 script=script,
             )
         )
+        if progress_callback:
+            progress_callback(idx + 1, total_slides, f"Processing slide {idx + 1} of {total_slides}")
 
     return PresentationData(id=pres_id, filename=filepath.name, slides=slides)
