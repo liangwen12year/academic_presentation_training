@@ -7,7 +7,6 @@ const App = {
     presentationId: null,
     slides: [],
     currentSlide: 0,
-    persona: 'professional',
     mediaRecorder: null,
     audioChunks: [],
     isRecording: false,
@@ -25,7 +24,6 @@ const App = {
     this.bindUpload();
     this.bindNavigation();
     this.bindRecording();
-    this.bindVoiceSelect();
     this.initAvatarMode();
     this.renderSessionStats();
     if ('speechSynthesis' in window) {
@@ -245,26 +243,6 @@ const App = {
     this.state.slides[this.state.currentSlide].script = textarea.value;
   },
 
-  // ── Voice Selection ────────────────────────────────────────────
-
-  bindVoiceSelect() {
-    document.querySelectorAll('.voice-option').forEach((el) => {
-      el.addEventListener('click', () => {
-        document.querySelectorAll('.voice-option').forEach((v) => v.classList.remove('active'));
-        el.classList.add('active');
-        this.state.persona = el.dataset.voice;
-
-        // Show/hide clone upload section
-        const cloneSection = document.getElementById('voice-clone-section');
-        if (el.dataset.voice === 'clone') {
-          cloneSection.classList.remove('hidden');
-        } else {
-          cloneSection.classList.add('hidden');
-        }
-      });
-    });
-  },
-
   // ── Results Column & Rating Modal ──────────────────────────────
 
   showResultsColumn() {
@@ -308,7 +286,6 @@ const App = {
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('slide_index', this.state.currentSlide);
-    form.append('persona', this.state.persona);
 
     try {
       const res = await fetch('/api/generate-reference', { method: 'POST', body: form });
@@ -351,7 +328,6 @@ const App = {
     this.showLoading('Generating reference audio for all slides...');
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
-    form.append('persona', this.state.persona);
 
     try {
       const res = await fetch('/api/generate-all-references', { method: 'POST', body: form });
