@@ -219,49 +219,6 @@ body {
 .reference-section { }
 .reference-section audio { width: 100%; margin-top: 0.5rem; }
 
-/* Voice selector */
-.voice-select {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-.voice-option {
-  flex: 1;
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  text-align: center;
-  position: relative;
-  cursor: pointer;
-  font-size: 0.8rem;
-  transition: all 0.15s;
-}
-.voice-option:hover { border-color: var(--primary-light); }
-.voice-option.active {
-  border-color: var(--primary);
-  background: #f0f0ff;
-  font-weight: 600;
-}
-.voice-option.clone-ready {
-  border-color: var(--success);
-  position: relative;
-}
-.voice-option.clone-ready::after {
-  content: "\2713";
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: var(--success);
-  color: white;
-  font-size: 0.6rem;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* Analysis results */
 .analysis-results { margin-top: 1.5rem; }
 .score-ring {

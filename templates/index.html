@@ -111,36 +111,6 @@
           <div class="card reference-section">
             <div class="section-header">Golden Reference</div>
 
-            <div>
-              <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.4rem;">Voice Persona</label>
-              <div class="voice-select">
-                <div class="voice-option active" data-voice="professional">Professional</div>
-                <div class="voice-option" data-voice="casual">Casual</div>
-                <div class="voice-option" data-voice="authoritative">Authoritative</div>
-                <div class="voice-option" data-voice="clone" id="voice-clone-btn">Clone Voice</div>
-              </div>
-            </div>
-
-            <!-- Voice Clone Section -->
-            <div id="voice-clone-section" class="hidden" style="margin-top: 0.75rem;">
-              <label style="font-size:0.8rem; color:var(--text-secondary); display:block; margin-bottom:0.4rem;">Record or upload a voice sample (10s–5min of clear speech)</label>
-
-              <div style="display:flex; gap:0.4rem; margin-bottom:0.4rem;">
-                <button class="btn btn-outline btn-sm" style="flex:1;" id="btn-clone-record" onclick="App.toggleCloneRecording()">Record Live</button>
-                <button class="btn btn-outline btn-sm" style="flex:1;" id="btn-clone-upload" onclick="document.getElementById('voice-clone-input').click()">Upload File</button>
-              </div>
-              <input type="file" id="voice-clone-input" accept="audio/*,.mp3,.wav,.m4a,.webm" style="display:none;" onchange="App.cloneFromFile()">
-
-              <div id="clone-record-ui" class="hidden" style="margin-top:0.4rem;">
-                <div style="display:flex; align-items:center; gap:0.5rem;">
-                  <span id="clone-rec-dot" style="width:10px;height:10px;border-radius:50%;background:var(--danger);animation:pulse 1s infinite;"></span>
-                  <span id="clone-rec-timer" style="font-size:0.85rem; font-variant-numeric:tabular-nums;">0:00</span>
-                </div>
-              </div>
-
-              <div id="clone-status" style="font-size:0.8rem; margin-top:0.4rem; color:var(--text-secondary);"></div>
-            </div>
-
             <div id="ref-audio-container" style="margin-top: 0.75rem;">
               <p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>
             </div>
