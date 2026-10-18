@@ -209,7 +209,7 @@ async def analyze(
             script=slide.script,
             reference_duration=ref_duration,
         )
-    except Exception:
+    except Exception as exc:
         logger.exception(
             "Recording analysis failed for presentation %s, slide %s",
             presentation_id,
@@ -217,7 +217,7 @@ async def analyze(
         )
         raise HTTPException(
             503,
-            "Analysis is temporarily unavailable. Please try again in a moment.",
+            f"Analysis could not transcribe this recording: {type(exc).__name__}: {exc}",
         )
 
     print(
