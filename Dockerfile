@@ -11,6 +11,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+ARG WHISPER_MODEL=tiny
+ENV HF_HOME=/opt/huggingface
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('${WHISPER_MODEL}', device='cpu', compute_type='int8')"
+
 COPY . .
 
 RUN mkdir -p uploads static/audio static/slides data
