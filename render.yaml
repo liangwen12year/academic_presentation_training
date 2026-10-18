@@ -11,4 +11,4 @@ services:
       - key: LLM_PROVIDER
         value: openai
       - key: WHISPER_MODEL
-        value: base
+        value: tiny

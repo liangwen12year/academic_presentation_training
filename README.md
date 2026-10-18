@@ -172,7 +172,7 @@ cp .env.example .env
 | `OPENAI_API_KEY` | Optional | OpenAI key for generating scripts when slides lack speaker notes. Falls back to slide text. |
 | `GOOGLE_API_KEY` | Optional | Alternative to OpenAI — Google Gemini for script generation. |
 | `LLM_PROVIDER` | Optional | `"openai"` (default) or `"gemini"` |
-| `WHISPER_MODEL` | Optional | Whisper model size: `tiny`, `base` (default), `small`, `medium`, `large`. Larger = more accurate but slower. |
+| `WHISPER_MODEL` | Optional | Whisper model size: `tiny`, `base` (default), `small`, `medium`, `large`. Larger = more accurate but slower. The Render deployment uses `tiny` to fit its free-instance memory limit. |
 
 **The app works with zero API keys** — it degrades gracefully with the following fallback behavior:
 

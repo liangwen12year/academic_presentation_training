@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import shutil
 import threading
 import uuid
@@ -24,6 +25,7 @@ from app.tts import clone_voice, generate_reference_audio, generate_word_audio, 
 from app.analysis import analyze_recording
 
 app = FastAPI(title="Presentation Training Coach")
+logger = logging.getLogger(__name__)
 
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 templates = Jinja2Templates(directory=str(settings.base_dir / "templates"))
@@ -281,11 +283,22 @@ async def analyze(
             except Exception:
                 pass
 
-    result = analyze_recording(
-        audio_path=rec_path,
-        script=slide.script,
-        reference_duration=ref_duration,
-    )
+    try:
+        result = analyze_recording(
+            audio_path=rec_path,
+            script=slide.script,
+            reference_duration=ref_duration,
+        )
+    except Exception:
+        logger.exception(
+            "Recording analysis failed for presentation %s, slide %s",
+            presentation_id,
+            slide_index,
+        )
+        raise HTTPException(
+            503,
+            "Analysis is temporarily unavailable. Please try again in a moment.",
+        )
 
     print(
         f"[A/B] pres={presentation_id} slide={slide_index} "

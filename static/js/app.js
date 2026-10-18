@@ -696,7 +696,7 @@ const App = {
       if (!res.ok) {
         const errText = await res.text();
         if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
-        throw new Error(errText);
+        throw new Error(this.getErrorMessage(errText));
       }
       this._pendingAnalysis = await res.json();
     } catch (err) {
@@ -1110,6 +1110,15 @@ const App = {
   },
 
   // ── Loading UI ─────────────────────────────────────────────────
+
+  getErrorMessage(responseText) {
+    try {
+      const response = JSON.parse(responseText);
+      return response.detail || responseText;
+    } catch {
+      return responseText;
+    }
+  },
 
   showLoading(msg) {
     const el = document.getElementById('loading-overlay');
