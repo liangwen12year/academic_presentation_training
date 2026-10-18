@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import shutil
-import threading
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -32,76 +29,6 @@ templates = Jinja2Templates(directory=str(settings.base_dir / "templates"))
 
 # In-memory session store (swap for Redis/DB in production)
 sessions: dict[str, PresentationData] = {}
-upload_jobs: dict[str, dict] = {}
-upload_jobs_lock = threading.Lock()
-
-
-def _presentation_response(pres: PresentationData) -> dict:
-    """Serialize presentation data returned after an upload completes."""
-    return {
-        "presentation_id": pres.id,
-        "filename": pres.filename,
-        "slide_count": len(pres.slides),
-        "slides": [
-            {
-                "index": s.index,
-                "id": s.id,
-                "image_url": s.image_path,
-                "has_notes": bool(s.notes),
-                "script": s.script,
-            }
-            for s in pres.slides
-        ],
-    }
-
-
-def _update_upload_job(job_id: str, **updates) -> None:
-    with upload_jobs_lock:
-        upload_jobs[job_id].update(updates)
-
-
-def _run_ingestion(
-    save_path: Path,
-    is_pdf: bool,
-    progress_callback: Callable[[int, int, str], None],
-) -> PresentationData:
-    ingest = ingest_pdf if is_pdf else ingest_pptx
-    return asyncio.run(ingest(save_path, progress_callback))
-
-
-async def _process_upload_job(job_id: str, save_path: Path, is_pdf: bool) -> None:
-    """Run slide ingestion off the event loop while exposing progress to the client."""
-    def report(completed: int, total: int, message: str) -> None:
-        progress = 10 if not total else 10 + int((completed / total) * 85)
-        _update_upload_job(
-            job_id,
-            status="processing",
-            progress=progress,
-            message=message,
-            completed=completed,
-            total=total,
-        )
-
-    try:
-        presentation = await asyncio.to_thread(_run_ingestion, save_path, is_pdf, report)
-        sessions[presentation.id] = presentation
-        _update_upload_job(
-            job_id,
-            status="completed",
-            progress=100,
-            message="Slides are ready",
-            presentation_id=presentation.id,
-            completed=1,
-            total=1,
-        )
-    except Exception as exc:
-        print(f"[ERROR] Upload processing failed: {exc}")
-        _update_upload_job(
-            job_id,
-            status="failed",
-            message="Unable to process this presentation",
-            error=str(exc),
-        )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -111,7 +38,7 @@ async def index(request: Request):
 
 @app.post("/api/upload")
 async def upload_presentation(file: UploadFile = File(...)):
-    """Start asynchronous PPTX or PDF processing and return a job identifier."""
+    """Upload a PPTX or PDF file, extract slides and scripts."""
     if not file.filename:
         raise HTTPException(400, "No file provided")
 
@@ -123,34 +50,27 @@ async def upload_presentation(file: UploadFile = File(...)):
     with open(save_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    job_id = uuid.uuid4().hex
-    with upload_jobs_lock:
-        upload_jobs[job_id] = {
-            "status": "queued",
-            "progress": 5,
-            "message": "Preparing your presentation",
-        }
-    asyncio.create_task(_process_upload_job(job_id, save_path, filename_lower.endswith(".pdf")))
-    return {"job_id": job_id}
+    if filename_lower.endswith(".pdf"):
+        presentation = await ingest_pdf(save_path)
+    else:
+        presentation = await ingest_pptx(save_path)
+    sessions[presentation.id] = presentation
 
-
-@app.get("/api/upload/{job_id}")
-async def get_upload_status(job_id: str):
-    """Return the current upload-processing state and final presentation data."""
-    with upload_jobs_lock:
-        job = upload_jobs.get(job_id)
-        if not job:
-            raise HTTPException(404, "Upload job not found")
-        result = dict(job)
-
-    if result["status"] == "completed":
-        presentation_id = result.pop("presentation_id")
-        presentation = sessions.get(presentation_id)
-        if not presentation:
-            raise HTTPException(404, "Processed presentation not found")
-        result["presentation"] = _presentation_response(presentation)
-
-    return result
+    return {
+        "presentation_id": presentation.id,
+        "filename": presentation.filename,
+        "slide_count": len(presentation.slides),
+        "slides": [
+            {
+                "index": slide.index,
+                "id": slide.id,
+                "image_url": slide.image_path,
+                "has_notes": bool(slide.notes),
+                "script": slide.script,
+            }
+            for slide in presentation.slides
+        ],
+    }
 
 
 @app.post("/api/clone-voice")
