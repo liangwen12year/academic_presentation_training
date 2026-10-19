@@ -109,21 +109,20 @@ def transcribe_audio(audio_path: Path, script: str = "") -> tuple[str, list[Word
     vocab_hint = _extract_vocab_hint(script) if script else None
     segments, info = model.transcribe(
         str(audio_path),
+        beam_size=5,
         word_timestamps=True,
         language="en",
         initial_prompt=vocab_hint,
-        repetition_penalty=1.5,
-        no_repeat_ngram_size=4,
-        condition_on_previous_text=False,
+        condition_on_previous_text=True,
     )
 
     words: list[WordResult] = []
     full_text_parts: list[str] = []
-    duration = 0.0
+    duration = info.duration or 0.0
 
     for segment in segments:
         full_text_parts.append(segment.text.strip())
-        if segment.end > duration:
+        if duration <= 0 and segment.end > duration:
             duration = segment.end
 
         if segment.words:
@@ -272,6 +271,19 @@ def compute_pacing(
     script_word_count: int = 0,
 ) -> PacingResult:
     """Compute words-per-minute and compare against reference."""
+    if script_word_count and user_word_count / script_word_count < 0.6:
+        return PacingResult(
+            user_wpm=round((user_word_count / user_duration * 60) if user_duration > 0 else 0, 1),
+            reference_wpm=round(
+                (script_word_count / reference_duration * 60)
+                if reference_duration and reference_duration > 0
+                else 110.0,
+                1,
+            ),
+            assessment="insufficient_transcript",
+            detail="Too little speech was recognized to assess pacing reliably.",
+        )
+
     user_wpm = (user_word_count / user_duration * 60) if user_duration > 0 else 0
 
     if reference_duration and reference_duration > 0:
@@ -353,7 +365,7 @@ def analyze_recording(
             edit_dist = _levenshtein_distance(expected_norm, spoken_norm)
             similarity = 1 - (edit_dist / max(len(expected_norm), len(spoken_norm), 1))
 
-            if similarity > 0.7:
+            if similarity >= 0.6:
                 continue
             else:
                 flagged.append(FlaggedWord(
@@ -382,15 +394,13 @@ def analyze_recording(
     red_count = sum(1 for f in flagged if f.flag == "red")
     yellow_count = sum(1 for f in flagged if f.flag == "yellow")
     filler_penalty = min(len(fillers) * 1, 10)
-    pacing_penalty = 0 if pacing.assessment == "good" else 5
-
     # Coverage: what fraction of script words were spoken correctly
     correct_count = total_words - red_count - yellow_count
     coverage = max(0, correct_count / max(total_words, 1))
     # Clarity: penalize unclear words
     clarity = max(0, 1 - (yellow_count / max(total_words, 1)))
     # Base 15 points + 60% coverage + 25% clarity
-    overall = max(0, min(100, 15 + coverage * 60 + clarity * 25 - filler_penalty - pacing_penalty))
+    overall = max(0, min(100, 15 + coverage * 60 + clarity * 25 - filler_penalty))
 
     return AnalysisResult(
         transcript=transcript,

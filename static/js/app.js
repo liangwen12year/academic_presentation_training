@@ -489,6 +489,15 @@ const App = {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.state.audioChunks.push(e.data);
       };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (this.state.audioCtx) {
+          this.state.audioCtx.close().catch(() => {});
+          this.state.audioCtx = null;
+        }
+        document.getElementById('recording-status').textContent = 'Recording complete';
+        document.getElementById('btn-submit-recording').disabled = false;
+      };
       recorder.start(1000);
       this.state.mediaRecorder = recorder;
       this.state.isRecording = true;
@@ -509,13 +518,8 @@ const App = {
   },
 
   stopRecording() {
-    if (this.state.mediaRecorder) {
+    if (this.state.mediaRecorder && this.state.mediaRecorder.state === 'recording') {
       this.state.mediaRecorder.stop();
-      this.state.stream.getTracks().forEach((t) => t.stop());
-    }
-    if (this.state.audioCtx) {
-      try { this.state.audioCtx.close(); } catch (e) { /* ignore */ }
-      this.state.audioCtx = null;
     }
     this.state.isRecording = false;
     cancelAnimationFrame(this.state.animFrameId);
@@ -524,8 +528,8 @@ const App = {
     btn.textContent = '🎙 Record Again';
     btn.classList.remove('btn-danger');
     btn.classList.add('btn-primary');
-    document.getElementById('recording-status').textContent = 'Recording complete';
-    document.getElementById('btn-submit-recording').disabled = false;
+    document.getElementById('recording-status').textContent = 'Finalizing recording...';
+    document.getElementById('btn-submit-recording').disabled = true;
 
     this.stopRealtimeCoach();
     this.updateAvatarState('idle');
@@ -791,7 +795,9 @@ const App = {
     // Pacing detail
     document.getElementById('pacing-detail').textContent = data.pacing.detail;
     const pacingBadge = document.getElementById('pacing-badge');
-    pacingBadge.textContent = data.pacing.assessment.replace(/_/g, ' ');
+    pacingBadge.textContent = data.pacing.assessment === 'insufficient_transcript'
+      ? 'unavailable'
+      : data.pacing.assessment.replace(/_/g, ' ');
     pacingBadge.className = 'filler-tag';
     if (data.pacing.assessment === 'good') pacingBadge.style.background = '#d1fae5';
     else if (data.pacing.assessment === 'a_bit_fast') pacingBadge.style.background = '#fee2e2';
@@ -848,7 +854,10 @@ const App = {
       rtPanel.classList.remove('hidden');
       const indicator = document.getElementById('rt-pace-indicator');
       if (indicator) {
-        if (data.pacing.assessment === 'good') {
+        if (data.pacing.assessment === 'insufficient_transcript') {
+          indicator.textContent = 'Unavailable';
+          indicator.className = 'rt-pace warning';
+        } else if (data.pacing.assessment === 'good') {
           indicator.textContent = 'Good';
           indicator.className = 'rt-pace good';
         } else if (data.pacing.assessment === 'a_bit_fast') {
@@ -922,7 +931,7 @@ const App = {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
     } else if (data.pacing.assessment === 'a_bit_slow') {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
-    } else {
+    } else if (data.pacing.assessment === 'good') {
       spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;
     }
 
@@ -984,7 +993,7 @@ const App = {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
     } else if (data.pacing.assessment === 'a_bit_slow') {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
-    } else {
+    } else if (data.pacing.assessment === 'good') {
       spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;
     }
 
