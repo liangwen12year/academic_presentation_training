@@ -544,7 +544,8 @@ const App = {
     const rtPanel = document.getElementById('realtime-feedback');
     if (rtPanel) {
       rtPanel.classList.remove('hidden');
-      document.getElementById('rt-pace-indicator').textContent = '--';
+      document.getElementById('rt-pace-indicator').textContent = 'After recording';
+      document.getElementById('rt-pace-indicator').className = 'rt-pace';
       document.getElementById('rt-filler-count').textContent = '0';
       document.getElementById('rt-energy-bar').style.width = '0%';
       document.getElementById('rt-alerts').innerHTML = '';
@@ -553,25 +554,6 @@ const App = {
     RealtimeCoach.onPauseTooLong = () => {
       if (Avatar.canvas) Avatar.briefReaction('pause_warning', 2000);
       this.addRealtimeAlert('Long pause detected — keep going!', 'warning');
-    };
-
-    RealtimeCoach.onPaceChange = (pace) => {
-      const indicator = document.getElementById('rt-pace-indicator');
-      if (indicator) {
-        if (pace === 'fast') {
-          indicator.textContent = 'A Bit Fast';
-          indicator.className = 'rt-pace danger';
-          if (typeof Avatar !== 'undefined' && Avatar.canvas && Avatar.state === 'listening') {
-            Avatar.briefReaction('pace_warning', 1500);
-          }
-        } else if (pace === 'slow') {
-          indicator.textContent = 'A Bit Slow';
-          indicator.className = 'rt-pace warning';
-        } else {
-          indicator.textContent = 'Good';
-          indicator.className = 'rt-pace good';
-        }
-      }
     };
 
     RealtimeCoach.onFillerDetected = (word) => {
