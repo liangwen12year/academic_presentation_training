@@ -32,6 +32,8 @@ const RealtimeCoach = {
   peakCount: 0,
   peakWindow: [],       // timestamps of detected peaks
   paceWindowMs: 10000,  // 10s rolling window
+  paceWarmupMs: 8000,
+  paceStartedAt: 0,
   lastPeakTime: 0,
   wasPeak: false,
   peakThreshold: 0.03,
@@ -64,6 +66,7 @@ const RealtimeCoach = {
     this.isSilent = false;
     this.pauseWarned = false;
     this.peakWindow = [];
+    this.paceStartedAt = 0;
     this.smoothEnergy = 0;
     this.recentFillers = [];
     this.stats = {
@@ -142,6 +145,7 @@ const RealtimeCoach = {
     const isPeak = this.smoothEnergy > this.peakThreshold;
     if (isPeak && !this.wasPeak) {
       this.peakWindow.push(now);
+      if (!this.paceStartedAt) this.paceStartedAt = now;
     }
     this.wasPeak = isPeak;
 
@@ -149,7 +153,7 @@ const RealtimeCoach = {
     this.peakWindow = this.peakWindow.filter((t) => now - t < this.paceWindowMs);
 
     // Estimate WPM from peaks (roughly 1.5 syllables per word)
-    if (this.peakWindow.length >= 3) {
+    if (this.peakWindow.length >= 3 && now - this.paceStartedAt >= this.paceWarmupMs) {
       const windowSec = (now - this.peakWindow[0]) / 1000;
       if (windowSec > 2) {
         const syllablesPerSec = this.peakWindow.length / windowSec;
