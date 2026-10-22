@@ -32,7 +32,7 @@ const RealtimeCoach = {
   peakCount: 0,
   peakWindow: [],       // timestamps of detected peaks
   paceWindowMs: 10000,  // 10s rolling window
-  paceWarmupMs: 8000,
+  paceWarmupMs: 5000,
   paceStartedAt: 0,
   lastPeakTime: 0,
   wasPeak: false,
