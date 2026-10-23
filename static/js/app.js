@@ -7,7 +7,6 @@ const App = {
     presentationId: null,
     slides: [],
     currentSlide: 0,
-    persona: 'professional',
     mediaRecorder: null,
     audioChunks: [],
     isRecording: false,
@@ -25,7 +24,6 @@ const App = {
     this.bindUpload();
     this.bindNavigation();
     this.bindRecording();
-    this.bindVoiceSelect();
     this.initAvatarMode();
     this.renderSessionStats();
     if ('speechSynthesis' in window) {
@@ -245,26 +243,6 @@ const App = {
     this.state.slides[this.state.currentSlide].script = textarea.value;
   },
 
-  // ── Voice Selection ────────────────────────────────────────────
-
-  bindVoiceSelect() {
-    document.querySelectorAll('.voice-option').forEach((el) => {
-      el.addEventListener('click', () => {
-        document.querySelectorAll('.voice-option').forEach((v) => v.classList.remove('active'));
-        el.classList.add('active');
-        this.state.persona = el.dataset.voice;
-
-        // Show/hide clone upload section
-        const cloneSection = document.getElementById('voice-clone-section');
-        if (el.dataset.voice === 'clone') {
-          cloneSection.classList.remove('hidden');
-        } else {
-          cloneSection.classList.add('hidden');
-        }
-      });
-    });
-  },
-
   // ── Results Column & Rating Modal ──────────────────────────────
 
   showResultsColumn() {
@@ -308,7 +286,6 @@ const App = {
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('slide_index', this.state.currentSlide);
-    form.append('persona', this.state.persona);
 
     try {
       const res = await fetch('/api/generate-reference', { method: 'POST', body: form });
@@ -351,7 +328,6 @@ const App = {
     this.showLoading('Generating reference audio for all slides...');
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
-    form.append('persona', this.state.persona);
 
     try {
       const res = await fetch('/api/generate-all-references', { method: 'POST', body: form });
@@ -513,6 +489,15 @@ const App = {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.state.audioChunks.push(e.data);
       };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (this.state.audioCtx) {
+          this.state.audioCtx.close().catch(() => {});
+          this.state.audioCtx = null;
+        }
+        document.getElementById('recording-status').textContent = 'Recording complete';
+        document.getElementById('btn-submit-recording').disabled = false;
+      };
       recorder.start(1000);
       this.state.mediaRecorder = recorder;
       this.state.isRecording = true;
@@ -533,13 +518,8 @@ const App = {
   },
 
   stopRecording() {
-    if (this.state.mediaRecorder) {
+    if (this.state.mediaRecorder && this.state.mediaRecorder.state === 'recording') {
       this.state.mediaRecorder.stop();
-      this.state.stream.getTracks().forEach((t) => t.stop());
-    }
-    if (this.state.audioCtx) {
-      try { this.state.audioCtx.close(); } catch (e) { /* ignore */ }
-      this.state.audioCtx = null;
     }
     this.state.isRecording = false;
     cancelAnimationFrame(this.state.animFrameId);
@@ -548,8 +528,8 @@ const App = {
     btn.textContent = '🎙 Record Again';
     btn.classList.remove('btn-danger');
     btn.classList.add('btn-primary');
-    document.getElementById('recording-status').textContent = 'Recording complete';
-    document.getElementById('btn-submit-recording').disabled = false;
+    document.getElementById('recording-status').textContent = 'Finalizing recording...';
+    document.getElementById('btn-submit-recording').disabled = true;
 
     this.stopRealtimeCoach();
     this.updateAvatarState('idle');
@@ -564,7 +544,8 @@ const App = {
     const rtPanel = document.getElementById('realtime-feedback');
     if (rtPanel) {
       rtPanel.classList.remove('hidden');
-      document.getElementById('rt-pace-indicator').textContent = '--';
+      document.getElementById('rt-pace-indicator').textContent = 'After recording';
+      document.getElementById('rt-pace-indicator').className = 'rt-pace';
       document.getElementById('rt-filler-count').textContent = '0';
       document.getElementById('rt-energy-bar').style.width = '0%';
       document.getElementById('rt-alerts').innerHTML = '';
@@ -573,25 +554,6 @@ const App = {
     RealtimeCoach.onPauseTooLong = () => {
       if (Avatar.canvas) Avatar.briefReaction('pause_warning', 2000);
       this.addRealtimeAlert('Long pause detected — keep going!', 'warning');
-    };
-
-    RealtimeCoach.onPaceChange = (pace) => {
-      const indicator = document.getElementById('rt-pace-indicator');
-      if (indicator) {
-        if (pace === 'fast') {
-          indicator.textContent = 'A Bit Fast';
-          indicator.className = 'rt-pace danger';
-          if (typeof Avatar !== 'undefined' && Avatar.canvas && Avatar.state === 'listening') {
-            Avatar.briefReaction('pace_warning', 1500);
-          }
-        } else if (pace === 'slow') {
-          indicator.textContent = 'A Bit Slow';
-          indicator.className = 'rt-pace warning';
-        } else {
-          indicator.textContent = 'Good';
-          indicator.className = 'rt-pace good';
-        }
-      }
     };
 
     RealtimeCoach.onFillerDetected = (word) => {
@@ -815,7 +777,9 @@ const App = {
     // Pacing detail
     document.getElementById('pacing-detail').textContent = data.pacing.detail;
     const pacingBadge = document.getElementById('pacing-badge');
-    pacingBadge.textContent = data.pacing.assessment.replace(/_/g, ' ');
+    pacingBadge.textContent = data.pacing.assessment === 'insufficient_transcript'
+      ? 'unavailable'
+      : data.pacing.assessment.replace(/_/g, ' ');
     pacingBadge.className = 'filler-tag';
     if (data.pacing.assessment === 'good') pacingBadge.style.background = '#d1fae5';
     else if (data.pacing.assessment === 'a_bit_fast') pacingBadge.style.background = '#fee2e2';
@@ -872,7 +836,10 @@ const App = {
       rtPanel.classList.remove('hidden');
       const indicator = document.getElementById('rt-pace-indicator');
       if (indicator) {
-        if (data.pacing.assessment === 'good') {
+        if (data.pacing.assessment === 'insufficient_transcript') {
+          indicator.textContent = 'Unavailable';
+          indicator.className = 'rt-pace warning';
+        } else if (data.pacing.assessment === 'good') {
           indicator.textContent = 'Good';
           indicator.className = 'rt-pace good';
         } else if (data.pacing.assessment === 'a_bit_fast') {
@@ -946,7 +913,7 @@ const App = {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
     } else if (data.pacing.assessment === 'a_bit_slow') {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
-    } else {
+    } else if (data.pacing.assessment === 'good') {
       spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;
     }
 
@@ -1008,7 +975,7 @@ const App = {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute, which is a bit fast. Try to slow down. `;
     } else if (data.pacing.assessment === 'a_bit_slow') {
       spoken += `Your pace was ${data.pacing.user_wpm} words per minute. Try speaking a little faster to keep your audience engaged. `;
-    } else {
+    } else if (data.pacing.assessment === 'good') {
       spoken += `Your pacing was good at ${data.pacing.user_wpm} words per minute. `;
     }
 

@@ -3,9 +3,11 @@
  *
  * Analyzes audio during recording to provide live feedback:
  * - Pause detection (sustained silence)
- * - Pace monitoring (speech rate via amplitude peaks)
  * - Filler word detection (via Web Speech API real-time transcription)
  * - Energy/volume tracking
+ *
+ * Pace is assessed after recording because amplitude peaks do not reliably
+ * correspond to spoken words, especially when audio is played through speakers.
  */
 
 const RealtimeCoach = {
@@ -16,7 +18,6 @@ const RealtimeCoach = {
 
   // Callbacks
   onPauseTooLong: null,    // () => void
-  onPaceChange: null,      // (pace: 'fast' | 'slow' | 'good') => void
   onFillerDetected: null,  // (word: string) => void
   onEnergyUpdate: null,    // (level: 0-1) => void
   onRealtimeWord: null,    // (word: string) => void
@@ -27,14 +28,6 @@ const RealtimeCoach = {
   silenceThreshold: 0.02,
   pauseWarningMs: 3000,
   pauseWarned: false,
-
-  // Pace tracking
-  peakCount: 0,
-  peakWindow: [],       // timestamps of detected peaks
-  paceWindowMs: 10000,  // 10s rolling window
-  lastPeakTime: 0,
-  wasPeak: false,
-  peakThreshold: 0.03,
 
   // Energy smoothing
   smoothEnergy: 0,
@@ -63,7 +56,6 @@ const RealtimeCoach = {
     this.silenceStart = performance.now();
     this.isSilent = false;
     this.pauseWarned = false;
-    this.peakWindow = [];
     this.smoothEnergy = 0;
     this.recentFillers = [];
     this.stats = {
@@ -136,38 +128,6 @@ const RealtimeCoach = {
         }
       }
       this.isSilent = false;
-    }
-
-    // Peak detection (approximate syllable/word boundaries)
-    const isPeak = this.smoothEnergy > this.peakThreshold;
-    if (isPeak && !this.wasPeak) {
-      this.peakWindow.push(now);
-    }
-    this.wasPeak = isPeak;
-
-    // Prune old peaks
-    this.peakWindow = this.peakWindow.filter((t) => now - t < this.paceWindowMs);
-
-    // Estimate WPM from peaks (roughly 1.5 syllables per word)
-    if (this.peakWindow.length >= 3) {
-      const windowSec = (now - this.peakWindow[0]) / 1000;
-      if (windowSec > 2) {
-        const syllablesPerSec = this.peakWindow.length / windowSec;
-        const estimatedWpm = (syllablesPerSec / 1.5) * 60;
-
-        // Record pace
-        this.stats.paceHistory.push({ time: now, wpm: estimatedWpm });
-
-        if (this.onPaceChange) {
-          if (estimatedWpm > 160) {
-            this.onPaceChange('fast');
-          } else if (estimatedWpm < 60) {
-            this.onPaceChange('slow');
-          } else {
-            this.onPaceChange('good');
-          }
-        }
-      }
     }
 
     this.animId = requestAnimationFrame(() => this.tick());

@@ -8,10 +8,7 @@ An AI-powered web application for practicing presentation delivery. Upload your 
 
 1. **Upload PPTX** — Drag-and-drop or browse for a `.pptx` file. The app extracts slide images (composited from embedded pictures or rendered as text placeholders), speaker notes, and generates scripts via LLM when notes are missing.
 
-2. **Golden Reference Audio** — Generate a reference reading for any slide using ElevenLabs TTS (or browser speech synthesis as a fallback). Choose from three voice personas:
-   - **Professional** — Steady, clear delivery
-   - **Casual** — Relaxed, conversational tone
-   - **Authoritative** — Confident, commanding presence
+2. **Golden Reference Audio** — Generate a reference reading for any slide using the default ElevenLabs voice (or browser speech synthesis as a fallback).
 
 3. **Record & Analyze** — Record yourself reading the slide script. The backend transcribes your audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (word-level timestamps + confidence scores), then runs a full analysis pipeline:
    - **Pronunciation scoring** — Levenshtein-based alignment of your transcript against the script. Words are flagged red (mispronunciation/skipped) or yellow (low confidence/unclear).
@@ -182,7 +179,7 @@ cp .env.example .env
 | Feature | With Valid API Key | Without Valid API Key |
 |---------|-------------------|----------------------|
 | **Script Generation** | LLM generates a natural speaker script from slide content (OpenAI GPT-4o-mini or Google Gemini) | Uses raw slide text as the script; if a slide has no text, defaults to "This is slide N." |
-| **Golden Reference Audio** | High-quality ElevenLabs TTS with selectable voice personas (Professional, Casual, Authoritative) | Falls back to browser's built-in `SpeechSynthesis` API (voice quality varies by browser/OS). If the browser lacks `SpeechSynthesis`, an alert prompts the user to configure `ELEVENLABS_API_KEY`. |
+| **Golden Reference Audio** | High-quality ElevenLabs TTS with the default voice | Falls back to browser's built-in `SpeechSynthesis` API (voice quality varies by browser/OS). If the browser lacks `SpeechSynthesis`, an alert prompts the user to configure `ELEVENLABS_API_KEY`. |
 | **Pronunciation Playback** | Click a flagged word to hear correct pronunciation via ElevenLabs TTS | Falls back to browser `SpeechSynthesis`. If unavailable, pronunciation playback is disabled. |
 | **Recording & Analysis** | Fully functional — uses local Whisper model (no API key needed) | Same — Whisper runs locally, no external API required |
 | **Avatar Coach & Audience** | Fully functional — runs entirely client-side | Same — no API dependency |
