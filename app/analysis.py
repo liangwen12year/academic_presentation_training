@@ -304,12 +304,12 @@ def compute_pacing(
         pace_reference = "recommended presentation pace"
 
     ratio = user_wpm / ref_wpm if ref_wpm > 0 else 1.0
-    alignment_percent = max(0, 1 - abs(1 - ratio) / 0.45) * 100
+    alignment_percent = max(0, 1 - abs(1 - ratio) / 0.15) * 100
 
-    if ratio > 1.45:
+    if ratio > 1.15:
         assessment = "a_bit_fast"
         detail = f"Your estimated pace was {user_wpm:.0f} WPM, faster than the {pace_reference} of {ref_wpm:.0f} WPM."
-    elif ratio < 0.55:
+    elif ratio < 0.85:
         assessment = "a_bit_slow"
         detail = f"Your estimated pace was {user_wpm:.0f} WPM, slower than the {pace_reference} of {ref_wpm:.0f} WPM."
     else:
