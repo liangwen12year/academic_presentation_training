@@ -53,6 +53,7 @@ class FlaggedWord:
 class PacingResult:
     user_wpm: float
     reference_wpm: float
+    alignment_percent: float | None
     assessment: str  # "too_fast", "too_slow", "good"
     detail: str
 
@@ -64,6 +65,8 @@ class AnalysisResult:
     flagged_words: list[FlaggedWord]
     filler_words: list[dict]
     filler_count: int
+    coverage_percent: float
+    clarity_percent: float
     pacing: PacingResult
     duration_seconds: float
     overall_score: float  # 0-100
@@ -136,10 +139,16 @@ def transcribe_audio(audio_path: Path, script: str = "") -> tuple[str, list[Word
                     )
                 )
 
-    full_text = " ".join(full_text_parts)
+    full_text = _clean_transcript(" ".join(full_text_parts))
     full_text, words = _deduplicate_transcript(full_text, words)
 
     return full_text, words, duration
+
+
+def _clean_transcript(text: str) -> str:
+    """Remove Whisper's unreliable comma insertions from the display transcript."""
+    text = re.sub(r",\s*", " ", text)
+    return re.sub(r"\s+([.!?])", r"\1", text)
 
 
 def _deduplicate_transcript(text: str, words: list[WordResult]) -> tuple[str, list[WordResult]]:
@@ -280,32 +289,37 @@ def compute_pacing(
                 else 110.0,
                 1,
             ),
+            alignment_percent=None,
             assessment="insufficient_transcript",
             detail="Too little speech was recognized to assess pacing reliably.",
         )
 
-    user_wpm = (user_word_count / user_duration * 60) if user_duration > 0 else 0
+    user_wpm = (script_word_count / user_duration * 60) if user_duration > 0 else 0
 
     if reference_duration and reference_duration > 0:
         ref_wpm = (script_word_count / reference_duration * 60)
+        pace_reference = "Golden Reference"
     else:
-        ref_wpm = 110.0  # typical academic/professional presentation pace
+        ref_wpm = 110.0
+        pace_reference = "recommended presentation pace"
 
     ratio = user_wpm / ref_wpm if ref_wpm > 0 else 1.0
+    alignment_percent = max(0, 1 - abs(1 - ratio) / 0.25) * 100
 
-    if ratio > 1.45:
+    if ratio > 1.25:
         assessment = "a_bit_fast"
-        detail = f"You spoke at {user_wpm:.0f} WPM, which is faster than the typical {ref_wpm:.0f} WPM range. Consider slowing down slightly."
-    elif ratio < 0.55:
+        detail = f"Your estimated pace was {user_wpm:.0f} WPM, faster than the {pace_reference} of {ref_wpm:.0f} WPM."
+    elif ratio < 0.75:
         assessment = "a_bit_slow"
-        detail = f"You spoke at {user_wpm:.0f} WPM, which is slower than the typical {ref_wpm:.0f} WPM range. Try picking up the pace a bit."
+        detail = f"Your estimated pace was {user_wpm:.0f} WPM, slower than the {pace_reference} of {ref_wpm:.0f} WPM."
     else:
         assessment = "good"
-        detail = f"Your pace of {user_wpm:.0f} WPM is well within the natural range."
+        detail = f"Your estimated pace of {user_wpm:.0f} WPM is aligned with the {pace_reference} of {ref_wpm:.0f} WPM."
 
     return PacingResult(
         user_wpm=round(user_wpm, 1),
         reference_wpm=round(ref_wpm, 1),
+        alignment_percent=round(alignment_percent, 1),
         assessment=assessment,
         detail=detail,
     )
@@ -399,8 +413,13 @@ def analyze_recording(
     coverage = max(0, correct_count / max(total_words, 1))
     # Clarity: penalize unclear words
     clarity = max(0, 1 - (yellow_count / max(total_words, 1)))
-    # Base 15 points + 60% coverage + 25% clarity
-    overall = max(0, min(100, 15 + coverage * 60 + clarity * 25 - filler_penalty))
+    pace_component = (
+        pacing.alignment_percent / 10
+        if pacing.alignment_percent is not None
+        else 10
+    )
+    # Base 10 points + 60% coverage + 20% clarity + 10% pace alignment.
+    overall = max(0, min(100, 10 + coverage * 60 + clarity * 20 + pace_component - filler_penalty))
 
     return AnalysisResult(
         transcript=transcript,
@@ -408,6 +427,8 @@ def analyze_recording(
         flagged_words=flagged,
         filler_words=fillers,
         filler_count=len(fillers),
+        coverage_percent=round(coverage * 100, 1),
+        clarity_percent=round(clarity * 100, 1),
         pacing=pacing,
         duration_seconds=round(duration, 2),
         overall_score=round(overall, 1),

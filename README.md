@@ -12,9 +12,9 @@ An AI-powered web application for practicing presentation delivery. Upload your 
 
 3. **Record & Analyze** — Record yourself reading the slide script. The backend transcribes your audio with [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (word-level timestamps + confidence scores), then runs a full analysis pipeline:
    - **Pronunciation scoring** — Levenshtein-based alignment of your transcript against the script. Words are flagged red (mispronunciation/skipped) or yellow (low confidence/unclear).
-   - **Pacing analysis** — Words-per-minute compared against the reference or a 130 WPM baseline. Assessed as "good," "too fast," or "too slow."
+   - **Pacing analysis** — Estimated pace compared against the Golden Reference when available, or a 110 WPM baseline otherwise. Assessed as "good," "too fast," or "too slow"; it is withheld when too little speech is recognized.
    - **Filler word detection** — Catches "um," "uh," "like," "you know," "basically," "actually," "literally," and others.
-   - **Overall score** — Weighted composite of accuracy (50%), clarity (30%), base (20%), minus penalties for fillers and pacing.
+   - **Delivery score** — Weighted composite of script coverage (60%), pronunciation/recognition clarity (20%), Golden Reference pace alignment (10%), and a 10-point base, minus filler-word penalties. Intonation and emphasis are not currently scored.
 
 4. **Pronunciation Playback** — Click any flagged word to hear the correct pronunciation via ElevenLabs TTS (or browser TTS fallback).
 

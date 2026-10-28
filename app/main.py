@@ -296,6 +296,8 @@ async def analyze(
         "transcript": result.transcript,
         "duration_seconds": result.duration_seconds,
         "overall_score": result.overall_score,
+        "coverage_percent": result.coverage_percent,
+        "clarity_percent": result.clarity_percent,
         "pacing": asdict(result.pacing),
         "filler_count": result.filler_count,
         "filler_words": result.filler_words,

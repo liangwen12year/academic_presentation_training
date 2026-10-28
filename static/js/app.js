@@ -770,9 +770,10 @@ const App = {
     scoreEl.style.color = scoreColor;
 
     // Metrics
-    document.getElementById('metric-wpm').textContent = data.pacing.user_wpm;
-    document.getElementById('metric-fillers').textContent = data.filler_count;
-    document.getElementById('metric-duration').textContent = data.duration_seconds + 's';
+    document.getElementById('metric-coverage').textContent = `${Math.round(data.coverage_percent)}%`;
+    document.getElementById('metric-clarity').textContent = `${Math.round(data.clarity_percent)}%`;
+    document.getElementById('metric-pace-alignment').textContent =
+      data.pacing.alignment_percent === null ? 'N/A' : `${Math.round(data.pacing.alignment_percent)}%`;
 
     // Pacing detail
     document.getElementById('pacing-detail').textContent = data.pacing.detail;
