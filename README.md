@@ -197,6 +197,41 @@ Open `http://localhost:8000` in your browser.
 
 The server runs with hot reload enabled, so code changes take effect automatically. Upload/audio/slide directories are excluded from reload watching.
 
+## Research data acquisition
+
+Third-party slide decks, papers, generated metadata, and experiment reports are
+kept out of Git. Developers can reconstruct the local research corpora with the
+download scripts below. The scripts are resumable and validate the PDF signature
+before accepting a file.
+
+Download the 100 ArcBench slide decks:
+
+```bash
+uv run python scripts/download_arcbench.py --type slides
+```
+
+To download the corresponding papers as well, use `--type both`. The script
+retrieves ArcBench's current CSV manifest from Hugging Face and writes files to
+`data/slides/arcbench/` by default.
+
+Download the selected MIT OpenCourseWare slide collections:
+
+```bash
+uv run python scripts/download_mit_ocw.py
+```
+
+The MIT downloader discovers PDFs from the configured course pages and records
+the source URL, course/domain, instructor, license, format, download date, page
+count, and text-extraction result in `data/slides/mit_ocw/metadata.csv`.
+Install [Poppler](https://poppler.freedesktop.org/) so `pdfinfo` and `pdftotext`
+are available for PDF inspection. Both downloaders also require `curl`.
+
+The ArcBench MIT license applies to its dataset metadata and code, not
+automatically to the linked papers or presentation files. MIT OpenCourseWare
+materials are generally distributed under CC BY-NC-SA 4.0, with possible
+third-party exceptions. Review and preserve each source's attribution and terms
+before redistributing any downloaded material.
+
 ## Usage Guide
 
 1. **Upload** — Drop a `.pptx` file onto the upload area
