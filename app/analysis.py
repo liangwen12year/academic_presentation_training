@@ -88,19 +88,41 @@ COMMON_WORDS = {
 }
 
 
-def _extract_vocab_hint(script: str) -> str | None:
-    """Extract unique/technical words from script as a vocabulary hint for Whisper."""
-    words = script.split()
-    unique = []
+def _extract_vocab_hint(script: str, max_terms: int = 12) -> str | None:
+    """Build a Whisper initial_prompt that spells out the script's technical terms.
+
+    Whisper treats initial_prompt as preceding transcript and imitates its style,
+    so the terms are joined into a natural sentence instead of a comma list
+    (a comma list made Whisper insert commas between ordinary words).
+    """
+    candidates = []
     seen = set()
-    for w in words:
-        clean = w.strip(".,;:!?\"'()-").lower()
-        if clean and clean not in COMMON_WORDS and clean not in seen:
-            seen.add(clean)
-            unique.append(w.strip(".,;:!?\"'()-"))
-    if not unique:
+    sentence_start = True
+    for i, w in enumerate(script.split()):
+        clean = w.strip(".,;:!?\"'()")
+        at_start = sentence_start
+        sentence_start = w.endswith((".", "!", "?"))
+        low = clean.lower()
+        if not clean or low in COMMON_WORDS or low in seen:
+            continue
+        if not re.search(r"[A-Za-z]", clean):
+            continue
+        # Priority: acronyms/mixed case/hyphenated or digits > proper nouns > long words
+        if any(c.isupper() for c in clean[1:]) or re.search(r"[-\d]", clean[1:]):
+            priority = 0
+        elif clean[0].isupper() and not at_start:
+            priority = 1
+        elif len(clean) >= 9:
+            priority = 2
+        else:
+            continue
+        seen.add(low)
+        candidates.append((priority, i, clean))
+
+    picked = sorted(sorted(candidates)[:max_terms], key=lambda t: t[1])
+    if not picked:
         return None
-    return "Vocabulary: " + ", ".join(unique) + "."
+    return "This is an academic presentation that mentions " + " and ".join(t[2] for t in picked) + "."
 
 
 def transcribe_audio(audio_path: Path, script: str = "") -> tuple[str, list[WordResult], float]:
@@ -139,16 +161,10 @@ def transcribe_audio(audio_path: Path, script: str = "") -> tuple[str, list[Word
                     )
                 )
 
-    full_text = _clean_transcript(" ".join(full_text_parts))
+    full_text = " ".join(full_text_parts)
     full_text, words = _deduplicate_transcript(full_text, words)
 
     return full_text, words, duration
-
-
-def _clean_transcript(text: str) -> str:
-    """Remove Whisper's unreliable comma insertions from the display transcript."""
-    text = re.sub(r",\s*", " ", text)
-    return re.sub(r"\s+([.!?])", r"\1", text)
 
 
 def _deduplicate_transcript(text: str, words: list[WordResult]) -> tuple[str, list[WordResult]]:
