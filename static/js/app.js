@@ -544,8 +544,6 @@ const App = {
     const rtPanel = document.getElementById('realtime-feedback');
     if (rtPanel) {
       rtPanel.classList.remove('hidden');
-      document.getElementById('rt-pace-indicator').textContent = 'After recording';
-      document.getElementById('rt-pace-indicator').className = 'rt-pace';
       document.getElementById('rt-filler-count').textContent = '0';
       document.getElementById('rt-energy-bar').style.width = '0%';
       document.getElementById('rt-alerts').innerHTML = '';
