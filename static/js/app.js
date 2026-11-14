@@ -996,16 +996,8 @@ const App = {
       container.innerHTML = '<p class="pron-note">Pronunciation assessment is unavailable right now.</p>';
       return;
     }
-    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-    // Expected stress: primary syllable bold, secondary underlined (expected only; stress is not assessed)
-    const stressHtml = (w) => {
-      if (w.syllables.length < 2) return '<span class="pron-muted">–</span>';
-      const parts = w.syllables.map((syl) => syl.stress === 1 ? `<b>${esc(syl.ipa)}</b>`
-        : syl.stress === 2 ? `<u>${esc(syl.ipa)}</u>` : esc(syl.ipa));
-      const source = w.stress_source === 'espeak' ? '<span class="pron-muted" title="Not in the CMU dictionary, from espeak">*</span>' : '';
-      return parts.join('·') + source;
-    };
+    const esc = this.escapeHtml;
+    const stressHtml = (w) => this.stressHtml(w.syllables, w.stress_source);
 
     const row = (w) => {
       const phones = w.phones
@@ -1035,11 +1027,51 @@ const App = {
       <p class="pron-note">${flagged.length
         ? `<span class="pron-red">${red} red</span> (clearly different) and <span class="pron-yellow">${flagged.length - red} yellow</span> (possibly different) of ${result.words.length} words.`
         : '<span class="pron-ok">All words pronounced as expected!</span>'}</p>
-      ${flagged.length ? table(flagged) : ''}
-      <details class="pron-all">
-        <summary>Show all ${result.words.length} words</summary>
-        ${table(result.words)}
-      </details>`;
+      ${flagged.length ? table(flagged) : ''}`;
+  },
+
+  escapeHtml(v) {
+    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+
+  // Expected stress: primary syllable bold, secondary underlined (expected only; stress is not assessed)
+  stressHtml(syllables, source) {
+    const esc = this.escapeHtml;
+    if (syllables.length < 2) return '<span class="pron-muted">–</span>';
+    const parts = syllables.map((syl) => syl.stress === 1 ? `<b>${esc(syl.ipa)}</b>`
+      : syl.stress === 2 ? `<u>${esc(syl.ipa)}</u>` : esc(syl.ipa));
+    const mark = source === 'espeak' ? '<span class="pron-muted" title="Not in the CMU dictionary, from espeak">*</span>' : '';
+    return parts.join('·') + mark;
+  },
+
+  async lookupWord(event) {
+    event.preventDefault();
+    const esc = this.escapeHtml;
+    const word = document.getElementById('word-lookup-input').value.trim();
+    const resultEl = document.getElementById('word-lookup-result');
+    if (!word) return;
+    try {
+      const res = await fetch(`/api/word-pronunciation?word=${encodeURIComponent(word)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Lookup failed');
+      const rows = data.pronunciations.map((p) => `
+        <div class="lookup-pron">
+          <span class="ipa">/${esc(p.ipa)}/</span>
+          <span class="ipa">${this.stressHtml(p.syllables, data.source)}</span>
+        </div>`).join('');
+      resultEl.innerHTML = `
+        <div class="lookup-head">
+          <span class="lookup-word">${esc(data.word)}</span>
+          <button class="pron-play" data-word="${esc(data.word)}" onclick="App.pronounceWord(this.dataset.word)" title="Hear it">▶</button>
+        </div>
+        ${rows}
+        <p class="pron-muted lookup-note">${data.pronunciations.length > 1
+          ? 'Several accepted pronunciations (e.g. noun vs verb, or regional variants). '
+          : ''}Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.source === 'espeak'
+          ? ' Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
+    } catch (err) {
+      resultEl.innerHTML = `<p class="pron-muted">${esc(err.message)}</p>`;
+    }
   },
 
   async playUserWord(index) {

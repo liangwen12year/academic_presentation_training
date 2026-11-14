@@ -20,7 +20,7 @@ from openpronounce import compare_phones, load_audio, phones
 from openpronounce.speech import _words as script_words  # same split OpenPronounce uses
 
 from app import cmu_variants
-from app.stress import expected_stress
+from app.stress import _cmu_with_stress, _espeak_with_stress, expected_stress, syllabify
 
 cmu_variants.install()
 
@@ -153,3 +153,26 @@ def assess_pronunciation(audio_path: Path, script: str) -> dict | None:
     except Exception as e:  # noqa: BLE001 - the rest of the analysis is still useful
         print(f"[WARN] Pronunciation assessment failed: {e}")
         return None
+
+
+def lookup_word(word: str) -> dict:
+    """Pronunciations of a single word with syllables and stress, for the word lookup.
+
+    Every CMU dictionary entry (a heteronym like "record" has one per part of speech),
+    or espeak's pronunciation when CMU doesn't have the word.
+    """
+    entries = cmu_variants._dictionary().get(word.lower(), [])
+    if entries:
+        pronunciations = [syllabify(_cmu_with_stress(arpabet)) for arpabet in entries]
+        source = "cmu"
+    else:
+        pronunciations = [syllabify(list(_espeak_with_stress(word)))]
+        source = "espeak"
+    return {
+        "word": word,
+        "source": source,
+        "pronunciations": [
+            {"ipa": "".join(syl["ipa"] for syl in syllables), "syllables": syllables}
+            for syllables in pronunciations
+        ],
+    }

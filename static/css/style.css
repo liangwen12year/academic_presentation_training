@@ -315,8 +315,22 @@ body {
   font-size: 0.75rem;
   cursor: pointer;
 }
-.pron-all { margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-secondary); }
-.pron-all summary { cursor: pointer; margin-bottom: 0.5rem; }
+.lookup-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.lookup-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+}
+#word-lookup-result { margin-top: 0.75rem; }
+.lookup-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
+.lookup-word { font-size: 1.2rem; font-weight: 700; }
+.lookup-pron { display: flex; gap: 1.5rem; padding: 0.3rem 0; font-size: 1rem; }
+.lookup-pron .ipa { font-family: "Doulos SIL", "Charis SIL", "Lucida Sans Unicode", serif; }
+.lookup-pron b { color: var(--primary); }
+.lookup-note { font-size: 0.8rem; margin-top: 0.4rem; }
 
 /* Pacing bar */
 .pacing-bar {
