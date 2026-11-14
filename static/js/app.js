@@ -1007,7 +1007,7 @@ const App = {
         ? `<button class="pron-play" onclick="App.playUserWord(${w.index})" title="Your pronunciation">▶</button>` : '';
       return `<tr>
         <td>${w.mispronounced ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word)}</td>
-        <td><button class="pron-play" data-word="${esc(w.word)}" onclick="App.pronounceWord(this.dataset.word)" title="Correct pronunciation">▶</button></td>
+        <td>${this.playButtonHtml(w.word, w.tts_phonemes, 'Correct pronunciation')}</td>
         <td>${yours}</td>
         <td class="ipa" title="Accepted: ${esc(w.accepted.map((a) => '/' + a + '/').join(', '))}">/${esc(w.expected)}/</td>
         <td class="ipa">${w.mispronounced ? '/' + esc(w.heard) + '/' : '<span class="pron-ok">✓</span>'}</td>
@@ -1028,6 +1028,13 @@ const App = {
         ? `<span class="pron-red">${red} red</span> (clearly different) and <span class="pron-yellow">${flagged.length - red} yellow</span> (possibly different) of ${result.words.length} words.`
         : '<span class="pron-ok">All words pronounced as expected!</span>'}</p>
       ${flagged.length ? table(flagged) : ''}`;
+  },
+
+  // ▶ that plays ``word`` read exactly as ``phonemes`` (see pronounceWord)
+  playButtonHtml(word, phonemes, title) {
+    const esc = this.escapeHtml;
+    const ph = phonemes ? ` data-alphabet="${esc(phonemes.alphabet)}" data-ph="${esc(phonemes.ph)}"` : '';
+    return `<button class="pron-play" data-word="${esc(word)}"${ph} onclick="App.pronounceWord(this.dataset.word, this.dataset)" title="${esc(title)}">▶</button>`;
   },
 
   escapeHtml(v) {
@@ -1056,18 +1063,18 @@ const App = {
       if (!res.ok) throw new Error(data.detail || 'Lookup failed');
       const rows = data.pronunciations.map((p) => `
         <div class="lookup-pron">
+          ${this.playButtonHtml(data.word, p.tts_phonemes, 'Hear this pronunciation')}
           <span class="ipa">/${esc(p.ipa)}/</span>
           <span class="ipa">${this.stressHtml(p.syllables, data.source)}</span>
         </div>`).join('');
       resultEl.innerHTML = `
         <div class="lookup-head">
           <span class="lookup-word">${esc(data.word)}</span>
-          <button class="pron-play" data-word="${esc(data.word)}" onclick="App.pronounceWord(this.dataset.word)" title="Hear it">▶</button>
         </div>
         ${rows}
         <p class="pron-muted lookup-note">${data.pronunciations.length > 1
           ? 'Several accepted pronunciations (e.g. noun vs verb, or regional variants). '
-          : ''}Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.source === 'espeak'
+          : ''}▶ plays each pronunciation as written. Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.source === 'espeak'
           ? ' Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
     } catch (err) {
       resultEl.innerHTML = `<p class="pron-muted">${esc(err.message)}</p>`;
@@ -1097,13 +1104,18 @@ const App = {
     }
   },
 
-  async pronounceWord(word) {
+  async pronounceWord(word, phonemes) {
     // Avatar demonstrates the word
     this.updateAvatarState('demonstrating');
 
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('word', word);
+    // Read exactly this pronunciation (the browser fallback below can't, it picks its own)
+    if (phonemes && phonemes.ph) {
+      form.append('alphabet', phonemes.alphabet);
+      form.append('ph', phonemes.ph);
+    }
 
     try {
       const res = await fetch('/api/pronounce', { method: 'POST', body: form });

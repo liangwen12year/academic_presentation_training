@@ -82,8 +82,21 @@ def _espeak_with_stress(word: str) -> tuple[tuple[str, int | None], ...]:
     return tuple(pairs)
 
 
-def expected_stress(word: str, matched: list[str]) -> tuple[list[dict], str]:
-    """Syllables with stress for ``word``, and where the stress came from ("cmu" or "espeak").
+def tts_phonemes(syllables: list[dict], arpabet: list[str] | None = None) -> dict:
+    """Phonemes for the TTS to read the word exactly this way (ElevenLabs ``<phoneme>`` tag).
+
+    CMU Arpabet when the pronunciation is a CMU entry (most reliable), otherwise IPA
+    with stress marks before the stressed syllables (required for multi-syllable words).
+    """
+    if arpabet:
+        return {"alphabet": "cmu-arpabet", "ph": " ".join(arpabet)}
+    marks = {1: "ˈ", 2: "ˌ"}
+    return {"alphabet": "ipa", "ph": "".join(marks.get(syl["stress"], "") + syl["ipa"] for syl in syllables)}
+
+
+def expected_stress(word: str, matched: list[str]) -> tuple[list[dict], str, dict]:
+    """Syllables with stress for ``word``, where the stress came from ("cmu" or "espeak"),
+    and the phonemes for the TTS to read that pronunciation (see ``tts_phonemes``).
 
     ``matched`` is the accepted pronunciation the word was compared with; when CMU
     lists several (e.g. "either"), the one closest to it is used.
@@ -95,5 +108,7 @@ def expected_stress(word: str, matched: list[str]) -> tuple[list[dict], str]:
             return min(Levenshtein.distance(f, matched) for f in forms)
 
         best = min(entries, key=distance)
-        return syllabify(_cmu_with_stress(best)), "cmu"
-    return syllabify(list(_espeak_with_stress(word))), "espeak"
+        syllables = syllabify(_cmu_with_stress(best))
+        return syllables, "cmu", tts_phonemes(syllables, best)
+    syllables = syllabify(list(_espeak_with_stress(word)))
+    return syllables, "espeak", tts_phonemes(syllables)

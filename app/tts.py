@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
+from xml.sax.saxutils import escape, quoteattr
 
 from app.config import settings
 
@@ -114,25 +116,50 @@ async def generate_reference_audio(
 async def generate_word_audio(
     word: str,
     pres_id: str,
+    phonemes: dict | None = None,
 ) -> str:
     """Generate pronunciation audio for a single word.
 
-    Used when the user clicks a flagged word to hear the correct pronunciation.
+    Used when the user clicks a flagged word or looks a word up. With ``phonemes``
+    (``{"alphabet": "cmu-arpabet" | "ipa", "ph": ...}``) the word is read exactly as
+    those phonemes, through an SSML phoneme tag, which only eleven_flash_v2 supports;
+    otherwise the voice picks a pronunciation itself.
     """
     if not _has_real_key():
         raise ValueError(
             "ELEVENLABS_API_KEY is not configured. Set a valid key in .env to use pronunciation playback."
         )
 
+    out_dir = settings.audio_dir / pres_id / "words"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe_word = "".join(c if c.isalnum() else "_" for c in word.lower())
+    if phonemes:
+        # One file per pronunciation ("record" as a noun and as a verb)
+        digest = hashlib.sha1(f"{phonemes['alphabet']}:{phonemes['ph']}".encode()).hexdigest()[:10]
+        filename = f"{safe_word}_{digest}.mp3"
+    else:
+        filename = f"{safe_word}.mp3"
+    out_path = out_dir / filename
+
+    # Cache: don't regenerate if already exists
+    if out_path.exists():
+        return f"/static/audio/{pres_id}/words/{filename}"
+
     from elevenlabs.client import ElevenLabs
 
     client = ElevenLabs(api_key=settings.elevenlabs_api_key)
 
+    if phonemes:
+        text = f'<phoneme alphabet={quoteattr(phonemes["alphabet"])} ph={quoteattr(phonemes["ph"])}>{escape(word)}</phoneme>'
+        model_id = "eleven_flash_v2"
+    else:
+        text, model_id = word, "eleven_multilingual_v2"
+
     # Use a clear, slow delivery for pronunciation
     audio_iter = client.text_to_speech.convert(
         voice_id=DEFAULT_VOICES["professional"],
-        text=word,
-        model_id="eleven_multilingual_v2",
+        text=text,
+        model_id=model_id,
         voice_settings={
             "stability": 0.85,
             "similarity_boost": 0.90,
@@ -141,16 +168,5 @@ async def generate_word_audio(
         },
     )
 
-    audio_bytes = b"".join(audio_iter)
-
-    out_dir = settings.audio_dir / pres_id / "words"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    safe_word = "".join(c if c.isalnum() else "_" for c in word.lower())
-    filename = f"{safe_word}.mp3"
-    out_path = out_dir / filename
-
-    # Cache: don't regenerate if already exists
-    if not out_path.exists():
-        out_path.write_bytes(audio_bytes)
-
+    out_path.write_bytes(b"".join(audio_iter))
     return f"/static/audio/{pres_id}/words/{filename}"

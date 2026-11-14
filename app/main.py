@@ -25,6 +25,7 @@ from app.config import settings
 from app.ingestion import PresentationData, ingest_pptx, ingest_pdf
 from app.tts import clone_voice, generate_reference_audio, generate_word_audio, get_cloned_voice_id
 from app.analysis import analyze_recording
+from app.cmu_variants import ARPABET_TO_IPA
 from app.pronunciation import assess_pronunciation, load_model as load_pronunciation_model, lookup_word
 
 app = FastAPI(title="Presentation Training Coach")
@@ -335,14 +336,27 @@ async def analyze(
 async def pronounce_word(
     presentation_id: str = Form(...),
     word: str = Form(...),
+    alphabet: str | None = Form(None),
+    ph: str | None = Form(None),
 ):
-    """Generate pronunciation audio for a single word."""
+    """Generate pronunciation audio for a single word, read as ``ph`` when given."""
     pres = sessions.get(presentation_id)
     if not pres:
         raise HTTPException(404, "Presentation not found")
 
+    phonemes = None
+    if alphabet and ph:
+        valid = (
+            all(re.fullmatch(r"[A-Z]{1,2}[012]?", t) and t.rstrip("012") in ARPABET_TO_IPA for t in ph.split())
+            if alphabet == "cmu-arpabet"
+            else alphabet == "ipa" and len(ph) <= 80 and not re.search(r"[<>&\"\s]", ph)
+        )
+        if not valid:
+            raise HTTPException(400, "Invalid phonemes")
+        phonemes = {"alphabet": alphabet, "ph": ph}
+
     try:
-        audio_url = await generate_word_audio(word=word, pres_id=pres.id)
+        audio_url = await generate_word_audio(word=word, pres_id=pres.id, phonemes=phonemes)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"audio_url": audio_url, "word": word}

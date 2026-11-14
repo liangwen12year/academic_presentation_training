@@ -20,7 +20,7 @@ from openpronounce import compare_phones, load_audio, phones
 from openpronounce.speech import _words as script_words  # same split OpenPronounce uses
 
 from app import cmu_variants
-from app.stress import _cmu_with_stress, _espeak_with_stress, expected_stress, syllabify
+from app.stress import _cmu_with_stress, _espeak_with_stress, expected_stress, syllabify, tts_phonemes
 
 cmu_variants.install()
 
@@ -112,7 +112,7 @@ def _assess(recognition, text: str, duration: float) -> dict:
     for i, (word, espeak) in enumerate(zip(script_words(text), result["expected_phones"])):
         report = reports_by_position.get(i)
         matched = report["expected"] if report else espeak
-        syllables, stress_source = expected_stress(word, matched)
+        syllables, stress_source, phonemes = expected_stress(word, matched)
         mispronounced = bool(report) and report["distance"] > 0
         # Confidence of the most certain wrong phone: red when sure, yellow when it may be noise.
         confidence = round(max((p["confidence"] for p in report["phones"]), default=0), 3) if mispronounced else None
@@ -128,6 +128,7 @@ def _assess(recognition, text: str, duration: float) -> dict:
             "phones": report["phones"] if report else [],
             "syllables": syllables,  # expected stress only; the recognizer hears none
             "stress_source": stress_source,
+            "tts_phonemes": phonemes,  # for the reference audio to say exactly this pronunciation
             "start": times.get(i, (None, None))[0],  # where the word is in the recording (seconds)
             "end": times.get(i, (None, None))[1],
         })
@@ -163,16 +164,17 @@ def lookup_word(word: str) -> dict:
     """
     entries = cmu_variants._dictionary().get(word.lower(), [])
     if entries:
-        pronunciations = [syllabify(_cmu_with_stress(arpabet)) for arpabet in entries]
+        pronunciations = [(syllabify(_cmu_with_stress(arpabet)), arpabet) for arpabet in entries]
         source = "cmu"
     else:
-        pronunciations = [syllabify(list(_espeak_with_stress(word)))]
+        pronunciations = [(syllabify(list(_espeak_with_stress(word))), None)]
         source = "espeak"
     return {
         "word": word,
         "source": source,
         "pronunciations": [
-            {"ipa": "".join(syl["ipa"] for syl in syllables), "syllables": syllables}
-            for syllables in pronunciations
+            {"ipa": "".join(syl["ipa"] for syl in syllables), "syllables": syllables,
+             "tts_phonemes": tts_phonemes(syllables, arpabet)}
+            for syllables, arpabet in pronunciations
         ],
     }
