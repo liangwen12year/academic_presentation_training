@@ -1028,7 +1028,8 @@ const App = {
       <tbody>${words.map(row).join('')}</tbody>
     </table></div>`;
 
-    const flagged = result.words.filter((w) => w.mispronounced);
+    // Words whose most certain wrong phone is below 0.5 are more likely recognizer noise: not listed
+    const flagged = result.words.filter((w) => w.mispronounced && w.confidence >= 0.5);
     const red = flagged.filter((w) => w.level === 'red').length;
     container.innerHTML = `
       <p class="pron-note">${flagged.length
