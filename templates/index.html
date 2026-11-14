@@ -55,6 +55,12 @@
             <label for="script-text">Speaker Script <span style="font-weight:normal;color:var(--text-secondary);">(editable)</span></label>
             <textarea id="script-text" placeholder="Script will appear here after upload..."></textarea>
           </div>
+
+          <!-- Pronunciation Feedback (shown with the analysis results; wide, so under the script) -->
+          <div id="pronunciation-card" class="card hidden" style="margin-top: 1rem;">
+            <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(▶ Reference: correct pronunciation, ▶ Yours: your recording)</span></div>
+            <div id="flagged-list" class="flagged-list"></div>
+          </div>
         </div>
 
         <!-- MIDDLE: Recording Controls -->
@@ -167,10 +173,6 @@
             <div style="margin-top: 1rem;">
               <div class="section-header">Filler Words</div>
               <div id="filler-list" class="filler-summary"></div>
-            </div>
-            <div style="margin-top: 1rem;">
-              <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(▶ Reference: correct pronunciation, ▶ Yours: your recording)</span></div>
-              <div id="flagged-list" class="flagged-list"></div>
             </div>
           </div>
         </div>

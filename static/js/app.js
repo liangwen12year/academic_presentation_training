@@ -247,10 +247,12 @@ const App = {
 
   showResultsColumn() {
     document.getElementById('results-column').classList.remove('hidden');
+    document.getElementById('pronunciation-card').classList.remove('hidden');
   },
 
   hideResultsColumn() {
     document.getElementById('results-column').classList.add('hidden');
+    document.getElementById('pronunciation-card').classList.add('hidden');
   },
 
   openRatingModal() {
