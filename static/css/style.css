@@ -292,6 +292,32 @@ body {
   cursor: pointer;
 }
 
+/* Pronunciation feedback table */
+.pron-note { font-size: 0.85rem; margin: 0.5rem 0; }
+.pron-red { color: var(--danger); }
+.pron-yellow { color: #b45309; }
+.pron-ok { color: var(--success); }
+.pron-muted { color: var(--text-secondary); }
+.pron-table-wrap { overflow-x: auto; }
+.pron-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.pron-table th, .pron-table td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.pron-table th { color: var(--text-secondary); font-weight: 600; }
+.pron-table td.ipa { font-family: "Doulos SIL", "Charis SIL", "Lucida Sans Unicode", serif; }
+.pron-table b { color: var(--primary); }
+.pron-table b.pron-red { color: var(--danger); }
+.pron-table b.pron-yellow { color: #b45309; }
+.pron-play {
+  background: var(--primary-light);
+  color: white;
+  border: none;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.pron-all { margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-secondary); }
+.pron-all summary { cursor: pointer; margin-bottom: 0.5rem; }
+
 /* Pacing bar */
 .pacing-bar {
   height: 8px;

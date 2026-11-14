@@ -16,3 +16,5 @@ pydantic-settings==2.5.2
 aiofiles==24.1.0
 librosa==0.10.2
 soundfile==0.12.1
+openpronounce @ git+https://github.com/Halleck45/OpenPronounce.git@74bc17ea406e6f057f15eea0e70951e1931af868
+cmudict>=1.0

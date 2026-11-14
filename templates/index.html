@@ -169,7 +169,7 @@
               <div id="filler-list" class="filler-summary"></div>
             </div>
             <div style="margin-top: 1rem;">
-              <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(click to hear correct pronunciation)</span></div>
+              <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(▶ Reference: correct pronunciation, ▶ Yours: your recording)</span></div>
               <div id="flagged-list" class="flagged-list"></div>
             </div>
           </div>
@@ -201,15 +201,11 @@
   <!-- Self-Assessment Modal -->
   <div id="rating-modal-overlay" class="analysis-modal-overlay">
     <div class="analysis-modal" style="max-width:480px;">
-      <button class="analysis-modal-close" onclick="App.closeRatingModal()">&times;</button>
+      <button class="analysis-modal-close" onclick="App.dismissRatingModal()">&times;</button>
 
       <div id="self-rating-panel" class="self-rating-panel">
         <div class="section-header">Your Self-Assessment</div>
-        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Rate yourself while the AI analyzes your recording.</p>
-        <div id="rating-analysis-status" style="font-size:0.8rem; color:var(--primary); margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
-          <span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
-          <span>Analyzing recording...</span>
-        </div>
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Your analysis is ready. Rate yourself first, then see the results.</p>
         <div class="rating-row">
           <label class="rating-label">How Well You Think You Did?</label>
           <div class="star-rating" id="star-overall">

@@ -257,6 +257,11 @@ const App = {
     document.getElementById('rating-modal-overlay').classList.add('visible');
   },
 
+  dismissRatingModal() {
+    this.closeRatingModal();
+    if (this.state.lastAnalysis) this.showResultsColumn();
+  },
+
   closeRatingModal(event) {
     if (event && event.target !== event.currentTarget) return;
     document.getElementById('rating-modal-overlay').classList.remove('visible');
@@ -495,10 +500,12 @@ const App = {
           this.state.audioCtx.close().catch(() => {});
           this.state.audioCtx = null;
         }
+        this.state.recordingSeconds = (Date.now() - this.state.recordingStartedAt) / 1000;
         document.getElementById('recording-status').textContent = 'Recording complete';
         document.getElementById('btn-submit-recording').disabled = false;
       };
       recorder.start(1000);
+      this.state.recordingStartedAt = Date.now();
       this.state.mediaRecorder = recorder;
       this.state.isRecording = true;
 
@@ -645,7 +652,36 @@ const App = {
 
     await this.saveScript();
 
-    // Show self-assessment immediately while analysis runs
+    // Analyze first (progress bar), then ask for the self-assessment, then show the results
+    this.updateAvatarState('thinking');
+    this.showAnalysisProgress(this.state.recordingSeconds || 0);
+    const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('slide_index', this.state.currentSlide);
+    form.append('audio', blob, 'recording.webm');
+    form.append('coach_mode', this.state.coachMode);
+
+    let analysis;
+    try {
+      const res = await fetch('/api/analyze', { method: 'POST', body: form });
+      if (!res.ok) {
+        const errText = await res.text();
+        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
+        throw new Error(errText);
+      }
+      analysis = await res.json();
+    } catch (err) {
+      this.hideLoading();
+      this.updateAvatarState('idle');
+      alert('Analysis failed: ' + err.message);
+      return;
+    }
+
+    // Render into the (still hidden) results column; it is shown once the rating is submitted
+    this.renderAnalysis(analysis);
+    this.hideLoading();
+
     this.selfRatings = { overall: 0, confidence: 0 };
     const ratingBtn = document.getElementById('btn-submit-rating');
     if (ratingBtn) { ratingBtn.textContent = 'Submit & View Results'; ratingBtn.disabled = false; }
@@ -658,52 +694,6 @@ const App = {
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
     this.openRatingModal();
-
-    // Run analysis in background
-    this.updateAvatarState('thinking');
-    const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
-    const form = new FormData();
-    form.append('presentation_id', this.state.presentationId);
-    form.append('slide_index', this.state.currentSlide);
-    form.append('audio', blob, 'recording.webm');
-    form.append('coach_mode', this.state.coachMode);
-
-    this._pendingAnalysis = null;
-    this._analysisError = null;
-    const statusEl = document.getElementById('rating-analysis-status');
-    if (statusEl) {
-      statusEl.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span><span>Analyzing recording...</span>';
-    }
-
-    try {
-      const res = await fetch('/api/analyze', { method: 'POST', body: form });
-      if (!res.ok) {
-        const errText = await res.text();
-        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
-        throw new Error(errText);
-      }
-      this._pendingAnalysis = await res.json();
-    } catch (err) {
-      this._analysisError = err.message;
-    }
-
-    // Analysis done -- render results and show right panel regardless of rating
-    if (this._pendingAnalysis) {
-      this.renderAnalysis(this._pendingAnalysis);
-      this.showResultsColumn();
-    }
-
-    // Update status in rating modal
-    const statusEl2 = document.getElementById('rating-analysis-status');
-    if (statusEl2) {
-      if (this._pendingAnalysis) {
-        statusEl2.innerHTML = '<span style="color:var(--success);">Analysis complete. Results are now visible.</span>';
-      } else if (this._analysisError) {
-        statusEl2.innerHTML = '<span style="color:var(--danger);">Analysis failed.</span>';
-        this.closeRatingModal();
-        alert('Analysis failed: ' + this._analysisError);
-      }
-    }
   },
 
   // ── Render Analysis Results ────────────────────────────────────
@@ -794,24 +784,8 @@ const App = {
       fillerContainer.innerHTML = '<span style="color:var(--success);font-size:0.85rem;">No filler words detected!</span>';
     }
 
-    // Flagged words
-    const flaggedContainer = document.getElementById('flagged-list');
-    if (data.flagged_words.length) {
-      flaggedContainer.innerHTML = data.flagged_words
-        .map(
-          (fw) => `
-        <div class="flagged-item" onclick="App.pronounceWord('${fw.word.replace(/'/g, "\\'")}')">
-          <span class="flag-dot ${fw.flag}"></span>
-          <span class="word">${fw.word}</span>
-          <span class="reason">${fw.reason}</span>
-          <button class="listen-btn">🔊 Listen</button>
-        </div>`
-        )
-        .join('');
-    } else {
-      flaggedContainer.innerHTML =
-        '<p style="color:var(--success);font-size:0.85rem;">All words pronounced correctly!</p>';
-    }
+    // Pronunciation feedback (phone level, from the pronunciation service)
+    this.renderPronunciation(data.pronunciation);
 
     // Annotated transcript
     const transcriptEl = document.getElementById('transcript-text');
@@ -1004,6 +978,88 @@ const App = {
 
   // ── Pronunciation Playback ─────────────────────────────────────
 
+  // ── Pronunciation Feedback ────────────────────────────────────
+
+  renderPronunciation(result) {
+    const container = document.getElementById('flagged-list');
+    // A new recording: drop the decoded audio of the previous one
+    if (this._userAudio) this._userAudio.ctx.close();
+    this._userAudio = null;
+    this._pronunciation = result;
+
+    if (!result) {
+      container.innerHTML = '<p class="pron-note">Pronunciation assessment is unavailable right now.</p>';
+      return;
+    }
+    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // Expected stress: primary syllable bold, secondary underlined (expected only; stress is not assessed)
+    const stressHtml = (w) => {
+      if (w.syllables.length < 2) return '<span class="pron-muted">–</span>';
+      const parts = w.syllables.map((syl) => syl.stress === 1 ? `<b>${esc(syl.ipa)}</b>`
+        : syl.stress === 2 ? `<u>${esc(syl.ipa)}</u>` : esc(syl.ipa));
+      const source = w.stress_source === 'espeak' ? '<span class="pron-muted" title="Not in the CMU dictionary, from espeak">*</span>' : '';
+      return parts.join('·') + source;
+    };
+
+    const row = (w) => {
+      const phones = w.phones
+        .filter((ph) => ph.expected !== ph.heard)
+        .map((ph) => `${esc(ph.expected || '∅')} → ${esc(ph.heard || '∅')}`).join(', ');
+      const yours = w.start != null && w.end > w.start
+        ? `<button class="pron-play" onclick="App.playUserWord(${w.index})" title="Your pronunciation">▶</button>` : '';
+      return `<tr>
+        <td>${w.mispronounced ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word)}</td>
+        <td><button class="pron-play" data-word="${esc(w.word)}" onclick="App.pronounceWord(this.dataset.word)" title="Correct pronunciation">▶</button></td>
+        <td>${yours}</td>
+        <td class="ipa" title="Accepted: ${esc(w.accepted.map((a) => '/' + a + '/').join(', '))}">/${esc(w.expected)}/</td>
+        <td class="ipa">${w.mispronounced ? '/' + esc(w.heard) + '/' : '<span class="pron-ok">✓</span>'}</td>
+        <td class="ipa">${stressHtml(w)}</td>
+        <td>${w.confidence ?? ''}</td>
+        <td class="ipa">${phones}</td>
+      </tr>`;
+    };
+    const table = (words) => `<div class="pron-table-wrap"><table class="pron-table">
+      <thead><tr><th>Word</th><th>Reference</th><th>Yours</th><th>Expected</th><th>Heard</th><th>Stress</th><th>Confidence</th><th>Phones (expected → heard)</th></tr></thead>
+      <tbody>${words.map(row).join('')}</tbody>
+    </table></div>`;
+
+    const flagged = result.words.filter((w) => w.mispronounced);
+    const red = flagged.filter((w) => w.level === 'red').length;
+    container.innerHTML = `
+      <p class="pron-note">${flagged.length
+        ? `<span class="pron-red">${red} red</span> (clearly different) and <span class="pron-yellow">${flagged.length - red} yellow</span> (possibly different) of ${result.words.length} words.`
+        : '<span class="pron-ok">All words pronounced as expected!</span>'}</p>
+      ${flagged.length ? table(flagged) : ''}
+      <details class="pron-all">
+        <summary>Show all ${result.words.length} words</summary>
+        ${table(result.words)}
+      </details>`;
+  },
+
+  async playUserWord(index) {
+    const word = this._pronunciation?.words[index];
+    if (!word || !this.state.audioChunks.length) return;
+    try {
+      // Decode the recording once, then play the word's slice of it
+      if (!this._userAudio) {
+        const ctx = new AudioContext();
+        const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
+        this._userAudio = { ctx, buffer: await ctx.decodeAudioData(await blob.arrayBuffer()) };
+      }
+      const { ctx, buffer } = this._userAudio;
+      if (ctx.state === 'suspended') await ctx.resume();
+      if (this._userWordSource) this._userWordSource.stop();
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0, word.start, word.end - word.start);
+      this._userWordSource = source;
+    } catch (err) {
+      console.warn('Failed to play your pronunciation:', err);
+    }
+  },
+
   async pronounceWord(word) {
     // Avatar demonstrates the word
     this.updateAvatarState('demonstrating');
@@ -1140,6 +1196,27 @@ const App = {
     }
   },
 
+  showAnalysisProgress(recordingSeconds) {
+    // Roughly measured on a 1-CPU server: Whisper + pronunciation take about as long as the recording
+    const estimateSeconds = 10 + 1.2 * recordingSeconds;
+    const startedAt = Date.now();
+    this.showLoading('Analyzing recording...');
+    document.getElementById('loading-progress').classList.remove('hidden');
+    const tick = () => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      // Never reach 100% before the analysis is actually done
+      const percent = Math.min(95, Math.round((elapsed / estimateSeconds) * 100));
+      const remaining = Math.ceil(estimateSeconds - elapsed);
+      this.updateUploadProgress(percent, 'Analyzing recording...');
+      document.getElementById('loading-elapsed').textContent = `Elapsed: ${this.formatDuration(Math.floor(elapsed))}`;
+      document.getElementById('loading-remaining').textContent = remaining > 0
+        ? `Estimated remaining: about ${this.formatDuration(remaining)}`
+        : 'Taking a little longer than expected...';
+    };
+    tick();
+    this.analysisTimer = setInterval(tick, 1000);
+  },
+
   formatDuration(totalSeconds) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = String(totalSeconds % 60).padStart(2, '0');
@@ -1149,6 +1226,8 @@ const App = {
   hideLoading() {
     clearInterval(this.uploadElapsedTimer);
     this.uploadElapsedTimer = null;
+    clearInterval(this.analysisTimer);
+    this.analysisTimer = null;
     document.getElementById('loading-overlay').classList.add('hidden');
   },
 };

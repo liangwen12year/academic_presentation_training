@@ -22,8 +22,15 @@ from app.config import settings
 from app.ingestion import PresentationData, ingest_pptx, ingest_pdf
 from app.tts import clone_voice, generate_reference_audio, generate_word_audio, get_cloned_voice_id
 from app.analysis import analyze_recording
+from app.pronunciation import assess_pronunciation, load_model as load_pronunciation_model
 
 app = FastAPI(title="Presentation Training Coach")
+
+
+@app.on_event("startup")
+async def preload_pronunciation_model() -> None:
+    # Loading takes a while; do it in the background so the server starts answering right away
+    threading.Thread(target=load_pronunciation_model, daemon=True).start()
 
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 templates = Jinja2Templates(directory=str(settings.base_dir / "templates"))
@@ -281,11 +288,9 @@ async def analyze(
             except Exception:
                 pass
 
-    result = analyze_recording(
-        audio_path=rec_path,
-        script=slide.script,
-        reference_duration=ref_duration,
-    )
+    # One after the other: both are CPU-bound and running them together would raise peak memory
+    result = await asyncio.to_thread(analyze_recording, rec_path, slide.script, ref_duration)
+    pronunciation = await asyncio.to_thread(assess_pronunciation, rec_path, slide.script)
 
     print(
         f"[A/B] pres={presentation_id} slide={slide_index} "
@@ -302,6 +307,7 @@ async def analyze(
         "filler_count": result.filler_count,
         "filler_words": result.filler_words,
         "flagged_words": [asdict(fw) for fw in result.flagged_words],
+        "pronunciation": pronunciation,
         "coach_mode": coach_mode,
     }
 
