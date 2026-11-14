@@ -205,17 +205,7 @@ const App = {
     const textarea = document.getElementById('script-text');
     textarea.value = slide.script;
 
-    // Reference audio — attach avatar speaking hooks
-    const refSection = document.getElementById('ref-audio-container');
-    if (slide.reference_audio_url) {
-      refSection.innerHTML = `<audio controls src="${slide.reference_audio_url}"></audio>`;
-      const audio = refSection.querySelector('audio');
-      audio.addEventListener('play', () => this.updateAvatarState('speaking'));
-      audio.addEventListener('pause', () => this.updateAvatarState('idle'));
-      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
-    } else {
-      refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
-    }
+    this.renderReferenceAudio();
 
     // Hide results column and close rating modal
     this.hideResultsColumn();
@@ -228,6 +218,23 @@ const App = {
     if (rtFeedback) rtFeedback.classList.add('hidden');
 
     this.updateAvatarState('idle');
+  },
+
+  // Golden reference player of the current slide (on its own, so generating a
+  // reference doesn't reset the slide and hide the analysis results)
+  renderReferenceAudio() {
+    const slide = this.state.slides[this.state.currentSlide];
+    // Reference audio — attach avatar speaking hooks
+    const refSection = document.getElementById('ref-audio-container');
+    if (slide.reference_audio_url) {
+      refSection.innerHTML = `<audio controls src="${slide.reference_audio_url}"></audio>`;
+      const audio = refSection.querySelector('audio');
+      audio.addEventListener('play', () => this.updateAvatarState('speaking'));
+      audio.addEventListener('pause', () => this.updateAvatarState('idle'));
+      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
+    } else {
+      refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
+    }
   },
 
   // ── Script Editing ─────────────────────────────────────────────
@@ -309,7 +316,7 @@ const App = {
       const data = await res.json();
 
       this.state.slides[this.state.currentSlide].reference_audio_url = data.audio_url;
-      this.renderSlide();
+      this.renderReferenceAudio();
     } catch (err) {
       alert('Failed to generate reference: ' + err.message);
     } finally {
@@ -344,7 +351,7 @@ const App = {
       data.results.forEach((r) => {
         this.state.slides[r.slide_index].reference_audio_url = r.audio_url;
       });
-      this.renderSlide();
+      this.renderReferenceAudio();
     } catch (err) {
       alert('Failed: ' + err.message);
     } finally {
