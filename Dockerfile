@@ -22,6 +22,9 @@ COPY . .
 
 RUN mkdir -p uploads static/audio static/slides data
 
+# Fewer malloc arenas: the analysis threads would otherwise each keep freed memory in their own
+ENV MALLOC_ARENA_MAX=2
+
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

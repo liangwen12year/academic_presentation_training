@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
+import gc
 import json
 import shutil
 import threading
@@ -39,6 +41,18 @@ templates = Jinja2Templates(directory=str(settings.base_dir / "templates"))
 sessions: dict[str, PresentationData] = {}
 upload_jobs: dict[str, dict] = {}
 upload_jobs_lock = threading.Lock()
+# One analysis at a time: with one CPU, parallel runs aren't faster, and their
+# memory peaks (Whisper + the phone model) would add up past the 2 GB instance.
+analysis_lock = asyncio.Lock()
+
+
+def _release_memory() -> None:
+    """Return memory freed by an analysis to the OS, so it doesn't creep up across requests."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):  # not glibc (e.g. macOS during development)
+        pass
 
 
 def _presentation_response(pres: PresentationData) -> dict:
@@ -289,8 +303,12 @@ async def analyze(
                 pass
 
     # One after the other: both are CPU-bound and running them together would raise peak memory
-    result = await asyncio.to_thread(analyze_recording, rec_path, slide.script, ref_duration)
-    pronunciation = await asyncio.to_thread(assess_pronunciation, rec_path, slide.script)
+    async with analysis_lock:
+        try:
+            result = await asyncio.to_thread(analyze_recording, rec_path, slide.script, ref_duration)
+            pronunciation = await asyncio.to_thread(assess_pronunciation, rec_path, slide.script)
+        finally:
+            _release_memory()
 
     print(
         f"[A/B] pres={presentation_id} slide={slide_index} "
