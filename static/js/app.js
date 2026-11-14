@@ -649,6 +649,8 @@ const App = {
 
   async submitRecording() {
     if (!this.state.audioChunks.length) return;
+    const submitBtn = document.getElementById('btn-submit-recording');
+    submitBtn.disabled = true;  // one analysis per recording
 
     await this.saveScript();
 
@@ -674,6 +676,7 @@ const App = {
     } catch (err) {
       this.hideLoading();
       this.updateAvatarState('idle');
+      submitBtn.disabled = false;  // let them retry
       alert('Analysis failed: ' + err.message);
       return;
     }
