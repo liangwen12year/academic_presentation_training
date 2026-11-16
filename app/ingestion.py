@@ -1,7 +1,8 @@
-"""PPTX ingestion: extract slides as images, speaker notes, and generate scripts."""
+"""PDF/PPTX ingestion: render slides, read notes, and generate scripts."""
 
 from __future__ import annotations
 
+import asyncio
 import io
 import subprocess
 import tempfile
@@ -11,10 +12,12 @@ from pathlib import Path
 from typing import Callable
 
 from PIL import Image
+from openai import OpenAI
 from pptx import Presentation
 from pptx.util import Emu
 
 from app.config import settings
+from app.speaker_scripts import SlideContext, generate_script, load_generation_instructions
 
 
 @dataclass
@@ -122,7 +125,10 @@ def _render_slides_with_libreoffice(pptx_path: Path, pres_id: str) -> list[str] 
                         capture_output=True,
                         timeout=120,
                     )
-                    png_files = sorted(Path(tmp_dir).glob("slide-*.png"))
+                    png_files = sorted(
+                        Path(tmp_dir).glob("slide-*.png"),
+                        key=lambda path: int(path.stem.rsplit("-", 1)[1]),
+                    )
                 except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
                     return None
 
@@ -217,6 +223,72 @@ def _extract_slide_text(slide) -> str:
     return "\n".join(texts)
 
 
+def _multimodal_setup() -> tuple[str, OpenAI] | None:
+    """Load the selected prompt when image-based generation is enabled."""
+
+    prompt_path = settings.speaker_script_prompt_path
+    if prompt_path is None:
+        return None
+
+    key = settings.openai_api_key.strip()
+    if not key or key.startswith("your-"):
+        raise ValueError(
+            "SPEAKER_SCRIPT_PROMPT_PATH is set, but OPENAI_API_KEY is missing or a placeholder"
+        )
+    if not settings.speaker_script_model.strip():
+        raise ValueError("SPEAKER_SCRIPT_MODEL must name an image-capable OpenAI model")
+
+    if not prompt_path.is_absolute():
+        prompt_path = settings.base_dir / prompt_path
+    instructions = load_generation_instructions(prompt_path)
+    return instructions, OpenAI(api_key=key)
+
+
+def _presentation_title(filepath: Path) -> str:
+    """Exclude the upload UUID prefix from the filename used as talk context."""
+
+    prefix, separator, original_stem = filepath.stem.partition("_")
+    if separator and len(prefix) == 32 and all(char in "0123456789abcdef" for char in prefix):
+        return original_stem
+    return filepath.stem
+
+
+async def _generate_multimodal_slide_script(
+    image_paths: list[str],
+    slide_index: int,
+    pres_id: str,
+    presentation_title: str,
+    notes: str,
+    instructions: str,
+    client: OpenAI,
+) -> str:
+    """Generate one script using the target and available neighboring images."""
+
+    def local_image(index: int) -> Path:
+        return settings.slides_dir / pres_id / Path(image_paths[index]).name
+
+    context = SlideContext(
+        slide_number=slide_index + 1,
+        preceding_slide_image=local_image(slide_index - 1) if slide_index else None,
+        target_slide_image=local_image(slide_index),
+        following_slide_image=(
+            local_image(slide_index + 1) if slide_index + 1 < len(image_paths) else None
+        ),
+        presentation_title=presentation_title,
+        speaker_notes=notes or None,
+    )
+    result = await asyncio.to_thread(
+        generate_script,
+        instructions,
+        context,
+        client=client,
+        model=settings.speaker_script_model,
+        max_output_tokens=settings.speaker_script_max_output_tokens,
+        reasoning_effort=settings.speaker_script_reasoning_effort,
+    )
+    return result.text
+
+
 async def generate_script_from_slide(slide_text: str, slide_index: int) -> str:
     """Use an LLM to generate a presentation script from slide content."""
     prompt = (
@@ -280,7 +352,10 @@ async def ingest_pdf(
             capture_output=True,
             timeout=120,
         )
-        png_files = sorted(out_dir.glob("slide-*.png"))
+        png_files = sorted(
+            out_dir.glob("slide-*.png"),
+            key=lambda path: int(path.stem.rsplit("-", 1)[1]),
+        )
         for idx, png_file in enumerate(png_files):
             filename = f"slide_{idx:03d}.png"
             png_file.rename(out_dir / filename)
@@ -299,28 +374,38 @@ async def ingest_pdf(
         except (ImportError, Exception) as e:
             print(f"[WARN] PDF rendering failed: {e}")
 
-    # Extract text per page using pdftotext
-    page_texts: list[str] = []
-    try:
-        for page_num in range(len(image_paths)):
-            result = subprocess.run(
-                ["pdftotext", "-f", str(page_num + 1), "-l", str(page_num + 1), str(filepath), "-"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            page_texts.append(result.stdout.strip())
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
-        pass
+    multimodal = _multimodal_setup()
+    if multimodal is not None and not image_paths:
+        raise ValueError("Image-based script generation requires rendered PDF slide images")
 
-    # Pad page_texts if extraction failed for some pages
-    while len(page_texts) < len(image_paths):
-        page_texts.append("")
+    # Text extraction is retained for the original, text-based generation mode.
+    page_texts: list[str] = []
+    if multimodal is None:
+        try:
+            for page_num in range(len(image_paths)):
+                result = subprocess.run(
+                    ["pdftotext", "-f", str(page_num + 1), "-l", str(page_num + 1), str(filepath), "-"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                page_texts.append(result.stdout.strip())
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        while len(page_texts) < len(image_paths):
+            page_texts.append("")
 
     slides: list[SlideData] = []
     for idx in range(len(image_paths)):
-        slide_text = page_texts[idx] if idx < len(page_texts) else ""
-        script = await generate_script_from_slide(slide_text, idx) if slide_text else f"Slide {idx + 1}."
+        if multimodal is not None:
+            instructions, client = multimodal
+            script = await _generate_multimodal_slide_script(
+                image_paths, idx, pres_id, _presentation_title(filepath), "", instructions, client
+            )
+        else:
+            slide_text = page_texts[idx] if idx < len(page_texts) else ""
+            script = await generate_script_from_slide(slide_text, idx) if slide_text else f"Slide {idx + 1}."
 
         slides.append(
             SlideData(
@@ -344,27 +429,42 @@ async def ingest_pptx(
     pres_id = uuid.uuid4().hex[:12]
     prs = Presentation(str(filepath))
     total_slides = len(prs.slides)
+    multimodal = _multimodal_setup()
     if progress_callback:
         progress_callback(0, total_slides, "Rendering slide images")
 
-    # Try LibreOffice rendering for full-fidelity slide images
+    # A multimodal script needs the complete page, including slide text and figures.
     lo_paths = _render_slides_with_libreoffice(filepath, pres_id)
+    if multimodal is not None and (not lo_paths or len(lo_paths) != total_slides):
+        raise ValueError(
+            "Image-based PPTX script generation requires LibreOffice to render every slide"
+        )
     if lo_paths:
         print(f"[INFO] Rendered {len(lo_paths)} slides with LibreOffice")
     else:
         print("[WARN] LibreOffice rendering failed, using fallback compositing")
 
-    slides: list[SlideData] = []
-
+    # Render every image before generating scripts so the next slide exists.
+    image_paths: list[str] = []
+    slide_notes: list[str] = []
     for idx, slide in enumerate(prs.slides):
         if lo_paths and idx < len(lo_paths):
             image_path = lo_paths[idx]
         else:
             image_path = _extract_slide_image_fallback(prs, slide, idx, pres_id)
+        image_paths.append(image_path)
+        slide_notes.append(_extract_notes(slide))
 
-        notes = _extract_notes(slide)
-
-        if notes:
+    slides: list[SlideData] = []
+    for idx, slide in enumerate(prs.slides):
+        image_path = image_paths[idx]
+        notes = slide_notes[idx]
+        if multimodal is not None:
+            instructions, client = multimodal
+            script = await _generate_multimodal_slide_script(
+                image_paths, idx, pres_id, _presentation_title(filepath), notes, instructions, client
+            )
+        elif notes:
             script = notes
         else:
             slide_text = _extract_slide_text(slide)

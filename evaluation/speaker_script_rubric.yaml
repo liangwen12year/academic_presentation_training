@@ -37,8 +37,8 @@ critical_grounding_error:
     The candidate contradicts supplied evidence or invents a consequential
     fact, quantity, trend, causal claim, statistical result, or conclusion.
   consequence:
-    eligible_for_optimization: false
-    selection_score: 0.0
+    per_example_scalar_score: 0.0
+    retain_diagnostic_feedback: true
   note: >-
     Minor imprecision is not automatically critical; record it in the
     grounding dimension and explain its likely impact.
@@ -46,7 +46,8 @@ critical_grounding_error:
 aggregation:
   method: unweighted_mean_of_applicable_dimensions
   report_dimension_vector: true
-  rounding_decimals: 2
+  normalized_scalar_range: [0.0, 1.0]
+  calculation: mean_applicable_dimension_score_divided_by_5
   note: >-
     Equal weighting is the initial experimental default, not a validated claim
     that all dimensions have identical importance. Always retain individual
