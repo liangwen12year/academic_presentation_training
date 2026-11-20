@@ -62,11 +62,11 @@
             <div id="flagged-list" class="flagged-list"></div>
           </div>
 
-          <!-- Word lookup: phonemes, stress and audio of any word -->
+          <!-- Pronunciation lookup: phonemes, stress and audio of any word or phrase -->
           <div class="card" style="margin-top: 1rem;">
-            <div class="section-header">Check a Word <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(not sure how to pronounce a word? look it up)</span></div>
+            <div class="section-header">Check Pronunciation <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(not sure how to say a word or phrase? look it up)</span></div>
             <form class="lookup-form" onsubmit="App.lookupWord(event)">
-              <input id="word-lookup-input" type="text" placeholder="e.g. hyperbole" autocomplete="off" spellcheck="false">
+              <input id="word-lookup-input" type="text" placeholder="e.g. hyperbole, or a record-breaking quarter" autocomplete="off" spellcheck="false">
               <button class="btn btn-primary btn-sm" type="submit">Look up</button>
             </form>
             <div id="word-lookup-result"></div>

@@ -32,7 +32,7 @@ from app.tts import (
 )
 from app.analysis import analyze_recording
 from app.cmu_variants import ARPABET_TO_IPA
-from app.pronunciation import assess_pronunciation, load_model as load_pronunciation_model, lookup_word
+from app.pronunciation import assess_pronunciation, load_model as load_pronunciation_model, lookup_text
 
 app = FastAPI(title="Presentation Training Coach")
 
@@ -387,12 +387,12 @@ async def pronounce_phrase(presentation_id: str = Form(...), text: str = Form(..
 
 
 @app.get("/api/word-pronunciation")
-def word_pronunciation(word: str):
-    """Phonemes, syllables and stress of a word the user looks up."""
-    word = word.strip().replace("\u2019", "'")
-    if not re.fullmatch(r"[A-Za-z][A-Za-z'\-]{0,40}", word):
-        raise HTTPException(400, "Enter a single English word")
-    return lookup_word(word)
+def word_pronunciation(text: str):
+    """Phonemes, syllables and stress of a word or phrase the user looks up."""
+    text = " ".join(text.replace("\u2019", "'").split())
+    if not re.fullmatch(r"[A-Za-z][A-Za-z'\-\s.,!?;:]{0,199}", text) or len(text.split()) > 30:
+        raise HTTPException(400, "Enter English words only (up to 30 words)")
+    return lookup_text(text)
 
 
 @app.post("/api/speak-feedback")

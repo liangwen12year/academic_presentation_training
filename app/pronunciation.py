@@ -178,3 +178,25 @@ def lookup_word(word: str) -> dict:
             for syllables, arpabet in pronunciations
         ],
     }
+
+
+def lookup_text(text: str) -> dict:
+    """Pronunciation of what the user looks up: a word (``lookup_word``) or a phrase.
+
+    For a phrase, each word gets the CMU entry closest to espeak's reading of it in the
+    phrase, so a heteronym follows its part of speech ("a record" vs "to record").
+    """
+    words, groups = phones.get_expected_phones(text)
+    # espeak's words are lowercased: show the words as the user typed them
+    typed = script_words(text)
+    if len(typed) == len(words):
+        words = typed
+    if len(words) == 1:
+        return {"kind": "word", **lookup_word(words[0])}
+    entries = []
+    for word, espeak in zip(words, groups):
+        syllables, source, phonemes = expected_stress(word, espeak)
+        entries.append({"word": word, "ipa": "".join(syl["ipa"] for syl in syllables), "syllables": syllables,
+                        "source": source, "tts_phonemes": phonemes})
+    # The phrase is read as typed, punctuation included, for natural intonation
+    return {"kind": "phrase", "text": text, "words": entries}

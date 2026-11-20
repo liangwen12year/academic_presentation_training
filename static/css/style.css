@@ -336,6 +336,8 @@ body {
 .lookup-pron .ipa { font-family: "Doulos SIL", "Charis SIL", "Lucida Sans Unicode", serif; }
 .lookup-pron b { color: var(--primary); }
 .lookup-note { font-size: 0.8rem; margin-top: 0.4rem; }
+.lookup-phrase-ipa { font-family: "Doulos SIL", "Charis SIL", "Lucida Sans Unicode", serif; font-size: 1rem; margin: 0 0 0.4rem; }
+.lookup-phrase-word { min-width: 7rem; font-weight: 600; }
 
 /* Pacing bar */
 .pacing-bar {

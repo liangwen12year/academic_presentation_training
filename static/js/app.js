@@ -1115,31 +1115,57 @@ const App = {
   async lookupWord(event) {
     event.preventDefault();
     const esc = this.escapeHtml;
-    const word = document.getElementById('word-lookup-input').value.trim();
+    const text = document.getElementById('word-lookup-input').value.trim();
     const resultEl = document.getElementById('word-lookup-result');
-    if (!word) return;
+    if (!text) return;
     try {
-      const res = await fetch(`/api/word-pronunciation?word=${encodeURIComponent(word)}`);
+      const res = await fetch(`/api/word-pronunciation?text=${encodeURIComponent(text)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Lookup failed');
-      const rows = data.pronunciations.map((p) => `
-        <div class="lookup-pron">
-          ${this.playButtonHtml(data.word, p.tts_phonemes, 'Hear this pronunciation')}
-          <span class="ipa">/${esc(p.ipa)}/</span>
-          <span class="ipa">${this.stressHtml(p.syllables, data.source)}</span>
-        </div>`).join('');
-      resultEl.innerHTML = `
-        <div class="lookup-head">
-          <span class="lookup-word">${esc(data.word)}</span>
-        </div>
-        ${rows}
-        <p class="pron-muted lookup-note">${data.pronunciations.length > 1
-          ? 'Several accepted pronunciations (e.g. noun vs verb, or regional variants). '
-          : ''}▶ plays each pronunciation as written. Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.source === 'espeak'
-          ? ' Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
+      resultEl.innerHTML = data.kind === 'phrase' ? this.lookupPhraseHtml(data) : this.lookupWordHtml(data);
     } catch (err) {
       resultEl.innerHTML = `<p class="pron-muted">${esc(err.message)}</p>`;
     }
+  },
+
+  lookupWordHtml(data) {
+    const esc = this.escapeHtml;
+    const rows = data.pronunciations.map((p) => `
+      <div class="lookup-pron">
+        ${this.playButtonHtml(data.word, p.tts_phonemes, 'Hear this pronunciation')}
+        <span class="ipa">/${esc(p.ipa)}/</span>
+        <span class="ipa">${this.stressHtml(p.syllables, data.source)}</span>
+      </div>`).join('');
+    return `
+      <div class="lookup-head">
+        <span class="lookup-word">${esc(data.word)}</span>
+      </div>
+      ${rows}
+      <p class="pron-muted lookup-note">${data.pronunciations.length > 1
+        ? 'Several accepted pronunciations (e.g. noun vs verb, or regional variants). '
+        : ''}▶ plays each pronunciation as written. Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.source === 'espeak'
+        ? ' Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
+  },
+
+  // A phrase: read as a whole, then word by word with each word's phonemes and stress
+  lookupPhraseHtml(data) {
+    const esc = this.escapeHtml;
+    const rows = data.words.map((w) => `
+      <div class="lookup-pron">
+        ${this.playButtonHtml(w.word, w.tts_phonemes, 'Hear this word')}
+        <span class="lookup-phrase-word">${esc(w.word)}</span>
+        <span class="ipa">/${esc(w.ipa)}/</span>
+        <span class="ipa">${this.stressHtml(w.syllables, w.source)}</span>
+      </div>`).join('');
+    return `
+      <div class="lookup-head">
+        <button class="pron-play" data-text="${esc(data.text)}" onclick="App.pronouncePhrase(this.dataset.text)" title="Hear the phrase">▶</button>
+        <span class="lookup-word">${esc(data.text)}</span>
+      </div>
+      <p class="ipa lookup-phrase-ipa">/${data.words.map((w) => esc(w.ipa)).join(' ')}/</p>
+      ${rows}
+      <p class="pron-muted lookup-note">The first ▶ reads the whole phrase naturally; the others play each word as written. Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.words.some((w) => w.source === 'espeak')
+        ? ' * Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
   },
 
   // Play seconds ``start`` to ``end`` of the user's recording (a word or a phrase)
