@@ -1021,21 +1021,28 @@ const App = {
       const timed = span.filter((w) => w.start != null && w.end > w.start);
       const yours = timed.length
         ? `<button class="pron-play" onclick="App.playUserRange(${timed[0].start}, ${timed[timed.length - 1].end})" title="Your phrase">▶</button>` : '';
-      const rows = p.words.length > 1 ? ` rowspan="${p.words.length}"` : '';
-      return `<td class="pron-phrase"${rows}>
-          <button class="pron-play" data-text="${esc(text)}" onclick="App.pronouncePhrase(this.dataset.text)" title="Correct phrase">▶</button>
-          <span>${shown}</span>
+      // A phrase shared by several words may wrap; a single word's phrase stays on one line
+      const multi = p.words.length > 1;
+      const rows = multi ? ` rowspan="${p.words.length}"` : '';
+      return `<td class="pron-phrase${multi ? ' pron-phrase-shared' : ''}"${rows}>
+          <div class="pron-phrase-body">
+            <button class="pron-play" data-text="${esc(text)}" onclick="App.pronouncePhrase(this.dataset.text)" title="Correct phrase">▶</button>
+            <span>${shown}</span>
+          </div>
         </td>
         <td${rows}>${yours}</td>`;
     };
 
-    const row = (w, phrase) => {
+    // ``k`` / ``n``: the word's place in its phrase and the phrase's word count
+    const row = (w, phrase, k, n) => {
       const phones = w.phones
         .filter((ph) => ph.expected !== ph.heard)
         .map((ph) => `${esc(ph.expected || '∅')} → ${esc(ph.heard || '∅')}`).join(', ');
       const yours = w.start != null && w.end > w.start
         ? `<button class="pron-play" onclick="App.playUserRange(${w.start}, ${w.end})" title="Your pronunciation">▶</button>` : '';
-      return `<tr>
+      // Rows sharing a phrase are tinted and joined by a bar, so the group is easy to see
+      const group = n > 1 ? ` class="pron-grouped${k === n - 1 ? ' pron-group-last' : ''}"` : '';
+      return `<tr${group}>
         <td>${w.mispronounced ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word)}</td>
         <td>${this.playButtonHtml(w.word, w.tts_phonemes, 'Correct pronunciation')}</td>
         <td>${yours}</td>
@@ -1049,7 +1056,7 @@ const App = {
     };
     const table = () => `<div class="pron-table-wrap"><table class="pron-table">
       <thead><tr><th>Word</th><th>Reference</th><th>Yours</th><th>Phrase reference</th><th>Your phrase</th><th>Expected</th><th>Heard</th><th>Stress</th><th>Confidence</th><th>Phones (expected → heard)</th></tr></thead>
-      <tbody>${phrases.map((p) => p.words.map((w, k) => row(w, k === 0 ? p : null)).join('')).join('')}</tbody>
+      <tbody>${phrases.map((p) => p.words.map((w, k) => row(w, k === 0 ? p : null, k, p.words.length)).join('')).join('')}</tbody>
     </table></div>`;
 
     container.innerHTML = `
