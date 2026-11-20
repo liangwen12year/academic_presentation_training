@@ -1033,16 +1033,15 @@ const App = {
         <td${rows}>${yours}</td>`;
     };
 
-    // ``k`` / ``n``: the word's place in its phrase and the phrase's word count
-    const row = (w, phrase, k, n) => {
+    // ``i``: the word's phrase; ``k`` / ``n``: its place in the phrase and the phrase's word count
+    const row = (w, phrase, i, k, n) => {
       const phones = w.phones
         .filter((ph) => ph.expected !== ph.heard)
         .map((ph) => `${esc(ph.expected || '∅')} → ${esc(ph.heard || '∅')}`).join(', ');
       const yours = w.start != null && w.end > w.start
         ? `<button class="pron-play" onclick="App.playUserRange(${w.start}, ${w.end})" title="Your pronunciation">▶</button>` : '';
-      // Rows sharing a phrase are tinted and joined by a bar, so the group is easy to see
-      const group = n > 1 ? ` class="pron-grouped${k === n - 1 ? ' pron-group-last' : ''}"` : '';
-      return `<tr${group}>
+      // Rows of one phrase are separated by a dashed line only (tinted together on hover)
+      return `<tr data-phrase="${i}"${k < n - 1 ? ' class="pron-in-phrase"' : ''}>
         <td>${w.mispronounced ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word)}</td>
         <td>${this.playButtonHtml(w.word, w.tts_phonemes, 'Correct pronunciation')}</td>
         <td>${yours}</td>
@@ -1056,7 +1055,7 @@ const App = {
     };
     const table = () => `<div class="pron-table-wrap"><table class="pron-table">
       <thead><tr><th>Word</th><th>Reference</th><th>Yours</th><th>Phrase reference</th><th>Your phrase</th><th>Expected</th><th>Heard</th><th>Stress</th><th>Confidence</th><th>Phones (expected → heard)</th></tr></thead>
-      <tbody>${phrases.map((p) => p.words.map((w, k) => row(w, k === 0 ? p : null, k, p.words.length)).join('')).join('')}</tbody>
+      <tbody>${phrases.map((p, i) => p.words.map((w, k) => row(w, k === 0 ? p : null, i, k, p.words.length)).join('')).join('')}</tbody>
     </table></div>`;
 
     container.innerHTML = `
@@ -1064,6 +1063,15 @@ const App = {
         ? `<span class="pron-red">${red} red</span> (clearly different) and <span class="pron-yellow">${flagged.length - red} yellow</span> (possibly different) of ${result.words.length} words.`
         : '<span class="pron-ok">All words pronounced as expected!</span>'}</p>
       ${flagged.length ? table() : ''}`;
+
+    // Hovering any row of a phrase tints all of its rows
+    const tbody = container.querySelector('tbody');
+    if (tbody) {
+      const tint = (phrase) => tbody.querySelectorAll('tr').forEach((tr) =>
+        tr.classList.toggle('pron-hover', tr.dataset.phrase === phrase));
+      tbody.addEventListener('mouseover', (e) => tint(e.target.closest('tr')?.dataset.phrase));
+      tbody.addEventListener('mouseleave', () => tint(null));
+    }
   },
 
   // Flagged words (in script order) grouped into phrases: words at most PHRASE_JOIN words apart share

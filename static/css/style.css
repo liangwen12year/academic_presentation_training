@@ -306,9 +306,8 @@ body {
 .pron-phrase-body { display: flex; align-items: flex-start; gap: 0.4rem; }
 .pron-phrase-body .pron-play { flex: none; }
 .pron-table td.pron-phrase-shared { white-space: normal; min-width: 16rem; max-width: 26rem; }
-.pron-table tr.pron-grouped td { background: rgba(79, 70, 229, 0.05); }
-.pron-table tr.pron-grouped td:first-child { box-shadow: inset 3px 0 0 var(--primary-light); }
-.pron-table tr.pron-grouped:not(.pron-group-last) td:not([rowspan]) { border-bottom: 1px dashed var(--border); }
+.pron-table tr.pron-in-phrase td:not([rowspan]) { border-bottom: 1px dashed var(--border); }
+.pron-table tr.pron-hover td { background: rgba(79, 70, 229, 0.07); }
 .pron-table b { color: var(--primary); }
 .pron-table b.pron-red { color: var(--danger); }
 .pron-table b.pron-yellow { color: #b45309; }
