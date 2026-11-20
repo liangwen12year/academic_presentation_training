@@ -997,7 +997,6 @@ const App = {
     // A new recording: drop the decoded audio of the previous one
     if (this._userAudio) this._userAudio.ctx.close();
     this._userAudio = null;
-    this._pronunciation = result;
 
     if (!result) {
       container.innerHTML = '<p class="pron-note">Pronunciation assessment is unavailable right now.</p>';
@@ -1006,16 +1005,41 @@ const App = {
     const esc = this.escapeHtml;
     const stressHtml = (w) => this.stressHtml(w.syllables, w.stress_source);
 
-    const row = (w) => {
+    // Words whose most certain wrong phone is below 0.3 are more likely recognizer noise: not listed.
+    // On L2-ARCTIC, flagged words at 0.3 and above are equally precise (~0.73); below it, ~0.53.
+    const flagged = result.words.filter((w) => w.mispronounced && w.confidence >= 0.3);
+    const red = flagged.filter((w) => w.level === 'red').length;
+    const listed = new Set(flagged.map((w) => w.index));
+    const phrases = this.groupPhrases(flagged, result.words.length);
+
+    // A phrase's two cells span the rows of all its flagged words
+    const phraseCells = (p) => {
+      const span = result.words.slice(p.start, p.end + 1);
+      const text = span.map((w) => w.word).join(' ');
+      const shown = span.map((w) => (listed.has(w.index)
+        ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word))).join(' ');
+      const timed = span.filter((w) => w.start != null && w.end > w.start);
+      const yours = timed.length
+        ? `<button class="pron-play" onclick="App.playUserRange(${timed[0].start}, ${timed[timed.length - 1].end})" title="Your phrase">▶</button>` : '';
+      const rows = p.words.length > 1 ? ` rowspan="${p.words.length}"` : '';
+      return `<td class="pron-phrase"${rows}>
+          <button class="pron-play" data-text="${esc(text)}" onclick="App.pronouncePhrase(this.dataset.text)" title="Correct phrase">▶</button>
+          <span>${shown}</span>
+        </td>
+        <td${rows}>${yours}</td>`;
+    };
+
+    const row = (w, phrase) => {
       const phones = w.phones
         .filter((ph) => ph.expected !== ph.heard)
         .map((ph) => `${esc(ph.expected || '∅')} → ${esc(ph.heard || '∅')}`).join(', ');
       const yours = w.start != null && w.end > w.start
-        ? `<button class="pron-play" onclick="App.playUserWord(${w.index})" title="Your pronunciation">▶</button>` : '';
+        ? `<button class="pron-play" onclick="App.playUserRange(${w.start}, ${w.end})" title="Your pronunciation">▶</button>` : '';
       return `<tr>
         <td>${w.mispronounced ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word)}</td>
         <td>${this.playButtonHtml(w.word, w.tts_phonemes, 'Correct pronunciation')}</td>
         <td>${yours}</td>
+        ${phrase ? phraseCells(phrase) : ''}
         <td class="ipa" title="Accepted: ${esc(w.accepted.map((a) => '/' + a + '/').join(', '))}">/${esc(w.expected)}/</td>
         <td class="ipa">${w.mispronounced ? '/' + esc(w.heard) + '/' : '<span class="pron-ok">✓</span>'}</td>
         <td class="ipa">${stressHtml(w)}</td>
@@ -1023,19 +1047,33 @@ const App = {
         <td class="ipa">${phones}</td>
       </tr>`;
     };
-    const table = (words) => `<div class="pron-table-wrap"><table class="pron-table">
-      <thead><tr><th>Word</th><th>Reference</th><th>Yours</th><th>Expected</th><th>Heard</th><th>Stress</th><th>Confidence</th><th>Phones (expected → heard)</th></tr></thead>
-      <tbody>${words.map(row).join('')}</tbody>
+    const table = () => `<div class="pron-table-wrap"><table class="pron-table">
+      <thead><tr><th>Word</th><th>Reference</th><th>Yours</th><th>Phrase reference</th><th>Your phrase</th><th>Expected</th><th>Heard</th><th>Stress</th><th>Confidence</th><th>Phones (expected → heard)</th></tr></thead>
+      <tbody>${phrases.map((p) => p.words.map((w, k) => row(w, k === 0 ? p : null)).join('')).join('')}</tbody>
     </table></div>`;
 
-    // Words whose most certain wrong phone is below 0.5 are more likely recognizer noise: not listed
-    const flagged = result.words.filter((w) => w.mispronounced && w.confidence >= 0.5);
-    const red = flagged.filter((w) => w.level === 'red').length;
     container.innerHTML = `
       <p class="pron-note">${flagged.length
         ? `<span class="pron-red">${red} red</span> (clearly different) and <span class="pron-yellow">${flagged.length - red} yellow</span> (possibly different) of ${result.words.length} words.`
         : '<span class="pron-ok">All words pronounced as expected!</span>'}</p>
-      ${flagged.length ? table(flagged) : ''}`;
+      ${flagged.length ? table() : ''}`;
+  },
+
+  // Flagged words (in script order) grouped into phrases: words at most PHRASE_JOIN words apart share
+  // one, padded by PHRASE_CONTEXT words on each side. Returns [{words, start, end}] (word positions).
+  groupPhrases(flagged, wordCount) {
+    const PHRASE_JOIN = 4, PHRASE_CONTEXT = 2;
+    const phrases = [];
+    for (const w of flagged) {
+      const last = phrases[phrases.length - 1];
+      if (last && w.index - last.words[last.words.length - 1].index <= PHRASE_JOIN) last.words.push(w);
+      else phrases.push({ words: [w] });
+    }
+    for (const p of phrases) {
+      p.start = Math.max(0, p.words[0].index - PHRASE_CONTEXT);
+      p.end = Math.min(wordCount - 1, p.words[p.words.length - 1].index + PHRASE_CONTEXT);
+    }
+    return phrases;
   },
 
   // ▶ that plays ``word`` read exactly as ``phonemes`` (see pronounceWord)
@@ -1089,9 +1127,9 @@ const App = {
     }
   },
 
-  async playUserWord(index) {
-    const word = this._pronunciation?.words[index];
-    if (!word || !this.state.audioChunks.length) return;
+  // Play seconds ``start`` to ``end`` of the user's recording (a word or a phrase)
+  async playUserRange(start, end) {
+    if (!this.state.audioChunks.length) return;
     try {
       // Decode the recording once, then play the word's slice of it
       if (!this._userAudio) {
@@ -1105,10 +1143,27 @@ const App = {
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(ctx.destination);
-      source.start(0, word.start, word.end - word.start);
+      source.start(0, start, end - start);
       this._userWordSource = source;
     } catch (err) {
       console.warn('Failed to play your pronunciation:', err);
+    }
+  },
+
+  async pronouncePhrase(text) {
+    this.updateAvatarState('demonstrating');
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('text', text);
+    try {
+      const res = await fetch('/api/pronounce-phrase', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const audio = new Audio(data.audio_url);
+      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
+      audio.play();
+    } catch (err) {
+      this.speakWithBrowser(text);
     }
   },
 

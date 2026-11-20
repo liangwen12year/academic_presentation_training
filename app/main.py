@@ -23,7 +23,13 @@ from starlette.requests import Request
 
 from app.config import settings
 from app.ingestion import PresentationData, ingest_pptx, ingest_pdf
-from app.tts import clone_voice, generate_reference_audio, generate_word_audio, get_cloned_voice_id
+from app.tts import (
+    clone_voice,
+    generate_phrase_audio,
+    generate_reference_audio,
+    generate_word_audio,
+    get_cloned_voice_id,
+)
 from app.analysis import analyze_recording
 from app.cmu_variants import ARPABET_TO_IPA
 from app.pronunciation import assess_pronunciation, load_model as load_pronunciation_model, lookup_word
@@ -360,6 +366,24 @@ async def pronounce_word(
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"audio_url": audio_url, "word": word}
+
+
+@app.post("/api/pronounce-phrase")
+async def pronounce_phrase(presentation_id: str = Form(...), text: str = Form(...)):
+    """Generate reference audio for a phrase around mispronounced words."""
+    pres = sessions.get(presentation_id)
+    if not pres:
+        raise HTTPException(404, "Presentation not found")
+
+    text = " ".join(text.split())
+    if not text or len(text) > 300:
+        raise HTTPException(400, "Phrase must be 1-300 characters")
+
+    try:
+        audio_url = await generate_phrase_audio(text=text, pres_id=pres.id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"audio_url": audio_url}
 
 
 @app.get("/api/word-pronunciation")

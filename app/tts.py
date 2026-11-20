@@ -170,3 +170,41 @@ async def generate_word_audio(
 
     out_path.write_bytes(b"".join(audio_iter))
     return f"/static/audio/{pres_id}/words/{filename}"
+
+
+async def generate_phrase_audio(text: str, pres_id: str) -> str:
+    """Generate reference audio for a short phrase around mispronounced words.
+
+    Read as plain text, so the words get their natural pronunciation in context.
+    """
+    if not _has_real_key():
+        raise ValueError(
+            "ELEVENLABS_API_KEY is not configured. Set a valid key in .env to use pronunciation playback."
+        )
+
+    out_dir = settings.audio_dir / pres_id / "phrases"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{hashlib.sha1(text.encode()).hexdigest()[:16]}.mp3"
+    out_path = out_dir / filename
+
+    # Cache: don't regenerate if already exists
+    if out_path.exists():
+        return f"/static/audio/{pres_id}/phrases/{filename}"
+
+    from elevenlabs.client import ElevenLabs
+
+    client = ElevenLabs(api_key=settings.elevenlabs_api_key)
+    audio_iter = client.text_to_speech.convert(
+        voice_id=DEFAULT_VOICES["professional"],
+        text=text,
+        model_id="eleven_multilingual_v2",
+        voice_settings={
+            "stability": 0.85,
+            "similarity_boost": 0.90,
+            "style": 0.10,
+            "use_speaker_boost": True,
+        },
+    )
+
+    out_path.write_bytes(b"".join(audio_iter))
+    return f"/static/audio/{pres_id}/phrases/{filename}"
