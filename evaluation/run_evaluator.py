@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +62,7 @@ def evaluate_script(
     instructions: str,
     max_output_tokens: int = 5000,
     reasoning_effort: str | None = None,
+    request_hook: Callable[[dict[str, Any]], None] | None = None,
 ) -> EvaluationRun:
     """Score the candidate script using target and neighboring slide images."""
 
@@ -69,17 +71,20 @@ def evaluate_script(
     kwargs: dict[str, Any] = {}
     if reasoning_effort:
         kwargs["reasoning"] = {"effort": reasoning_effort}
-    response = client.responses.parse(
-        model=model,
-        input=[
+    request: dict[str, Any] = {
+        "model": model,
+        "input": [
             {"role": "system", "content": instructions},
             {"role": "user", "content": slide_content(slide, candidate_script=script)},
         ],
-        text_format=EvaluationResult,
-        max_output_tokens=max_output_tokens,
-        store=False,
+        "text_format": EvaluationResult,
+        "max_output_tokens": max_output_tokens,
+        "store": False,
         **kwargs,
-    )
+    }
+    if request_hook is not None:
+        request_hook(request)
+    response = client.responses.parse(**request)
     if response.output_parsed is None:
         raise ValueError("Evaluator returned no parsed JSON result")
     return EvaluationRun(result=response.output_parsed, usage=response_usage(response))

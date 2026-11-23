@@ -44,6 +44,8 @@ class ScoredExample:
     score: float
     generation_usage: dict[str, int]
     evaluator_usage: dict[str, int]
+    position: str | None = None
+    slide_type: str | None = None
 
     def to_record(self, split: str, candidate_label: str) -> dict:
         return {
@@ -53,6 +55,8 @@ class ScoredExample:
             "example_id": self.example_id,
             "deck_id": self.deck_id,
             "slide_number": self.slide_number,
+            "position": self.position,
+            "slide_type": self.slide_type,
             "script": self.script,
             "evaluation": self.evaluation.model_dump(mode="json"),
             "score": self.score,
@@ -78,7 +82,6 @@ class ScoredExample:
             "example_id": self.example_id,
             "slide_number": self.slide_number,
             "speaker_script": self.script,
-            "critical_grounding_error": self.evaluation.critical_grounding_error.model_dump(mode="json"),
             "dimensions": dimensions,
         }
 
@@ -138,6 +141,8 @@ def score_example(
         score=calculate_score(evaluated.result),
         generation_usage=generated.usage,
         evaluator_usage=evaluated.usage,
+        position=example.position,
+        slide_type=example.slide_type,
     )
 
 
@@ -165,7 +170,7 @@ def evaluate_set(
 
 
 def summarize(results: list[ScoredExample]) -> dict:
-    """Aggregate scores, critical errors, dimension means, and token usage."""
+    """Aggregate scores, dimension means, and token usage."""
 
     if not results:
         raise ValueError("Cannot summarize an empty evaluation set")
@@ -188,9 +193,6 @@ def summarize(results: list[ScoredExample]) -> dict:
     return {
         "n": len(results),
         "mean_score": mean(result.score for result in results),
-        "critical_grounding_error_count": sum(
-            result.evaluation.critical_grounding_error.present for result in results
-        ),
         "dimension_means_1_to_5": dimension_means,
         "generation_input_tokens": token_total("generation_usage", "input_tokens"),
         "generation_output_tokens": token_total("generation_usage", "output_tokens"),

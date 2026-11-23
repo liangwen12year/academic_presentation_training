@@ -33,8 +33,8 @@ OBJECTIVE = (
 BACKGROUND = (
     "The target slide image is primary evidence. Neighbor images support transitions; "
     "they are not evidence that a claim appears on the target slide. Optional notes or "
-    "source excerpts may add context. The evaluator penalizes critical grounding errors "
-    "with a zero per-example scalar score. The candidate must be a complete system "
+    "source excerpts may add context. Grounding errors lower the grounding "
+    "dimension score. The candidate must be a complete system "
     "instruction that can replace the current one without changing user inputs."
 )
 

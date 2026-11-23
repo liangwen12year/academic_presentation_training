@@ -1,4 +1,4 @@
-"""Render explicitly selected ArcBench PDF pages for a small GEPA pilot.
+"""Render explicitly selected PDF pages for a GEPA pilot or fixed baseline.
 
 This command is intentionally opt-in. It reads ``example_selection.json`` (or
 another selection file), validates every deck and one-based page number, then
@@ -12,7 +12,8 @@ Example, from the repository root::
         --selection experiments/gepa/example_selection.json \
         --output-root data/gepa/pilot
 
-The command does not call any model API. It requires Poppler's ``pdfinfo`` and
+Baseline selections carry page-position metadata; manual review and slide-type
+labels are optional. The command does not call any model API. It requires Poppler's ``pdfinfo`` and
 ``pdftoppm`` executables and refuses to overwrite an existing output directory.
 """
 
@@ -28,7 +29,9 @@ from pathlib import Path
 from experiments.gepa.dataset import load_manifest
 
 _DECK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
-_SPLITS = {"train", "val", "test"}
+_SPLITS = {"train", "val", "test", "baseline"}
+_BASELINE_POSITIONS = {"beginning", "middle", "penultimate_page", "penultimate_substantive"}
+_SLIDE_TYPES = {"text", "chart", "table", "diagram", "equation", "image", "mixed", "other"}
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SOURCE = _ROOT / "data" / "slides" / "arcbench" / "slides"
 _DEFAULT_SELECTION = _ROOT / "experiments" / "gepa" / "example_selection.json"
@@ -46,6 +49,8 @@ class SelectedDeck:
     presentation_title: str | None
     intended_audience: str | None
     target_duration_seconds: float | None
+    slide_metadata: tuple[tuple[int, str, str | None], ...]
+    reviewed: bool
 
 
 def _optional_text(value: object, field: str, deck_id: str) -> str | None:
@@ -77,6 +82,7 @@ def _page_count(pdf_path: Path) -> int:
 
 
 def _selection_decks(selection_path: Path, source_root: Path) -> tuple[SelectedDeck, ...]:
+    source_root = source_root.resolve()
     selection = json.loads(selection_path.read_text(encoding="utf-8"))
     if not isinstance(selection, dict) or not isinstance(selection.get("decks"), list):
         raise ValueError("Selection must be a JSON object with a decks array")
@@ -97,7 +103,7 @@ def _selection_decks(selection_path: Path, source_root: Path) -> tuple[SelectedD
 
         split = raw_deck.get("split")
         if split not in _SPLITS:
-            raise ValueError(f"Deck {deck_id}: split must be train, val, or test")
+            raise ValueError(f"Deck {deck_id}: split must be train, val, test, or baseline")
 
         pdf_name = raw_deck.get("pdf")
         if not isinstance(pdf_name, str) or not pdf_name.strip():
@@ -113,14 +119,53 @@ def _selection_decks(selection_path: Path, source_root: Path) -> tuple[SelectedD
         if pdf_path in seen_pdfs:
             raise ValueError(f"PDF selected more than once: {pdf_path}")
 
-        raw_pages = raw_deck.get("slide_numbers")
+        raw_selected_slides = raw_deck.get("slides")
+        slide_metadata: tuple[tuple[int, str, str], ...] = ()
+        reviewed = raw_deck.get("reviewed") is True
+        if split == "baseline":
+            if not isinstance(raw_selected_slides, list) or len(raw_selected_slides) != 3:
+                raise ValueError(f"Deck {deck_id}: baseline requires exactly three selected slides")
+            if raw_deck.get("slide_numbers") is not None:
+                raise ValueError(f"Deck {deck_id}: use slides, not slide_numbers, for baseline")
+            metadata: list[tuple[int, str, str | None]] = []
+            for raw_slide in raw_selected_slides:
+                if not isinstance(raw_slide, dict):
+                    raise ValueError(f"Deck {deck_id}: each slide must be an object")
+                position = raw_slide.get("position")
+                slide_type = raw_slide.get("slide_type")
+                if not isinstance(position, str) or position not in _BASELINE_POSITIONS:
+                    raise ValueError(f"Deck {deck_id}: invalid baseline position: {position}")
+                if slide_type is not None and (not isinstance(slide_type, str) or slide_type not in _SLIDE_TYPES):
+                    raise ValueError(f"Deck {deck_id}: invalid slide_type: {slide_type}")
+                if position == "penultimate_substantive":
+                    position = "penultimate_page"  # Accept selection drafts made before review became optional.
+                metadata.append((raw_slide.get("slide_number"), position, slide_type))
+            if {position for _, position, _ in metadata} != {"beginning", "middle", "penultimate_page"}:
+                raise ValueError(f"Deck {deck_id}: one slide is required for each position")
+            slide_metadata = tuple(metadata)
+            raw_pages = [page for page, _, _ in metadata]
+        else:
+            if raw_selected_slides is not None:
+                raise ValueError(f"Deck {deck_id}: slides metadata is only supported for baseline")
+            raw_pages = raw_deck.get("slide_numbers")
         if not isinstance(raw_pages, list) or not raw_pages:
             raise ValueError(f"Deck {deck_id}: slide_numbers must be a nonempty array")
         if any(isinstance(page, bool) or not isinstance(page, int) or page < 1 for page in raw_pages):
             raise ValueError(f"Deck {deck_id}: slide_numbers must contain positive integers")
         if len(set(raw_pages)) != len(raw_pages):
             raise ValueError(f"Deck {deck_id}: slide_numbers contains duplicate pages")
+        if split == "baseline":
+            by_position = {position: page for page, position, _ in slide_metadata}
+            if not (
+                by_position["beginning"]
+                < by_position["middle"]
+                < by_position["penultimate_page"]
+            ):
+                raise ValueError(f"Deck {deck_id}: baseline positions must follow page order")
         page_count = _page_count(pdf_path)
+        declared_page_count = raw_deck.get("page_count")
+        if declared_page_count is not None and declared_page_count != page_count:
+            raise ValueError(f"Deck {deck_id}: PDF page count changed since selection")
         if any(page > page_count for page in raw_pages):
             raise ValueError(f"Deck {deck_id}: page number exceeds PDF's {page_count} pages")
 
@@ -140,6 +185,8 @@ def _selection_decks(selection_path: Path, source_root: Path) -> tuple[SelectedD
                 presentation_title=_optional_text(raw_deck.get("presentation_title"), "presentation_title", deck_id),
                 intended_audience=_optional_text(raw_deck.get("intended_audience"), "intended_audience", deck_id),
                 target_duration_seconds=duration,
+                slide_metadata=slide_metadata,
+                reviewed=reviewed,
             )
         )
         seen_deck_ids.add(deck_id)
@@ -191,6 +238,10 @@ def prepare_pilot(selection_path: Path, source_root: Path, output_root: Path) ->
     for deck in decks:
         deck_dir = output_images / deck.deck_id
         deck_dir.mkdir()
+        metadata_by_page = {
+            page: (position, slide_type)
+            for page, position, slide_type in deck.slide_metadata
+        }
         needed_pages = {
             neighbor
             for page in deck.slide_numbers
@@ -215,12 +266,21 @@ def prepare_pilot(selection_path: Path, source_root: Path, output_root: Path) ->
                 "presentation_title": deck.presentation_title,
                 "intended_audience": deck.intended_audience,
                 "target_duration_seconds": deck.target_duration_seconds,
+                "position": metadata_by_page.get(page, (None, None))[0],
+                "slide_type": metadata_by_page.get(page, (None, None))[1],
+                "source_pdf": str(deck.pdf_path.relative_to(source_root)),
+                "source_page_count": deck.page_count,
             }
             examples.append(example)
 
     manifest_path = output_root / "manifest.json"
     manifest_path.write_text(
-        json.dumps({"schema_version": "1.0.0", "render_dpi": 200, "examples": examples}, indent=2) + "\n",
+        json.dumps({
+            "schema_version": "1.0.0",
+            "render_dpi": 200,
+            "selection_reviewed": all(deck.reviewed for deck in decks),
+            "examples": examples,
+        }, indent=2) + "\n",
         encoding="utf-8",
     )
     load_manifest(manifest_path, output_images)

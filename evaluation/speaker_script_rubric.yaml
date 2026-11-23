@@ -1,4 +1,4 @@
-schema_version: "1.0.0"
+schema_version: "1.1.0"
 name: speaker_script_quality
 description: >-
   Reference-free rubric for evaluating a candidate script spoken while one
@@ -32,21 +32,10 @@ scoring_scale:
   4: strong with minor limitations
   5: excellent for the available evidence and task
 
-critical_grounding_error:
-  definition: >-
-    The candidate contradicts supplied evidence or invents a consequential
-    fact, quantity, trend, causal claim, statistical result, or conclusion.
-  consequence:
-    per_example_scalar_score: 0.0
-    retain_diagnostic_feedback: true
-  note: >-
-    Minor imprecision is not automatically critical; record it in the
-    grounding dimension and explain its likely impact.
-
 aggregation:
   method: unweighted_mean_of_applicable_dimensions
   report_dimension_vector: true
-  normalized_scalar_range: [0.0, 1.0]
+  normalized_scalar_range: [0.2, 1.0]
   calculation: mean_applicable_dimension_score_divided_by_5
   note: >-
     Equal weighting is the initial experimental default, not a validated claim
@@ -63,7 +52,7 @@ dimensions:
     applicable: always
     anchors:
       1: >-
-        Contains a critical contradiction or consequential invented claim that
+        Contains a severe contradiction or consequential invented claim that
         materially misrepresents the slide or source.
       2: >-
         Contains notable unsupported claims or misleading interpretations, but

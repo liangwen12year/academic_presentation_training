@@ -39,11 +39,7 @@ class FakeResponses:
 def example_evaluation() -> EvaluationResult:
     return EvaluationResult.model_validate(
         {
-            "rubric_version": "1.0.0",
-            "critical_grounding_error": {
-                "present": True,
-                "claims": ["The script invents a trend not visible on the slide"],
-            },
+            "rubric_version": "1.1.0",
             "dimensions": {
                 name: {
                     "applicable": True,
@@ -89,9 +85,9 @@ class GepaPipelineTests(unittest.TestCase):
                 ),
             )
 
-            self.assertEqual(scored.score, 0.0)
+            self.assertEqual(scored.score, 0.8)
             self.assertEqual(scored.generation_usage["input_tokens"], 100)
-            self.assertTrue(scored.feedback_for_gepa()["critical_grounding_error"]["present"])
+            self.assertEqual(scored.feedback_for_gepa()["dimensions"]["grounding"]["score"], 4)
             for request in (responses.generation_input, responses.evaluation_input):
                 self.assertIsNotNone(request)
                 user_content = request[1]["content"]

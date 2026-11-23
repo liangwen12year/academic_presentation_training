@@ -146,8 +146,8 @@ def main() -> None:
                     "first_score": first.score,
                     "comparison_score": second.score,
                     "score_delta": second.score - first.score,
-                    "first_critical_grounding_error": first.evaluation.critical_grounding_error.present,
-                    "comparison_critical_grounding_error": second.evaluation.critical_grounding_error.present,
+                    "first_grounding_score": first.evaluation.dimensions.grounding.score,
+                    "comparison_grounding_score": second.evaluation.dimensions.grounding.score,
                 }
                 for first, second in zip(results, comparison_results, strict=True)
             ],

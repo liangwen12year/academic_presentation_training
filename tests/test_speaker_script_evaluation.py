@@ -8,13 +8,9 @@ from evaluation.evaluator_schema import DIMENSION_NAMES, EvaluationResult
 from evaluation.scoring import calculate_score
 
 
-def _result(*, score: int = 4, critical: bool = False) -> dict:
+def _result(*, score: int = 4) -> dict:
     return {
-        "rubric_version": "1.0.0",
-        "critical_grounding_error": {
-            "present": critical,
-            "claims": ["Invented a statistical result"] if critical else [],
-        },
+        "rubric_version": "1.1.0",
         "dimensions": {
             name: {
                 "applicable": True,
@@ -44,10 +40,12 @@ class SpeakerScriptEvaluationTests(unittest.TestCase):
 
         self.assertAlmostEqual(calculate_score(result), 21 / 25)
 
-    def test_critical_grounding_error_overrides_other_scores(self) -> None:
-        result = EvaluationResult.model_validate(_result(score=5, critical=True))
+    def test_low_grounding_score_contributes_without_zero_override(self) -> None:
+        data = _result(score=5)
+        data["dimensions"]["grounding"]["score"] = 1
+        result = EvaluationResult.model_validate(data)
 
-        self.assertEqual(calculate_score(result), 0.0)
+        self.assertAlmostEqual(calculate_score(result), 31 / 35)
 
     def test_rejects_invalid_dimension(self) -> None:
         invalid_cases = (
@@ -77,13 +75,13 @@ class SpeakerScriptEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             EvaluationResult.model_validate(extra)
 
-    def test_rejects_wrong_version_and_unexplained_critical_error(self) -> None:
+    def test_rejects_wrong_version_and_removed_critical_error_field(self) -> None:
         outdated = _result()
         outdated["rubric_version"] = "0.9.0"
         with self.assertRaises(ValidationError):
             EvaluationResult.model_validate(outdated)
 
-        unexplained = _result(critical=True)
-        unexplained["critical_grounding_error"]["claims"] = []
+        unexplained = _result()
+        unexplained["critical_grounding_error"] = {"present": True, "claims": ["Invented fact"]}
         with self.assertRaises(ValidationError):
             EvaluationResult.model_validate(unexplained)

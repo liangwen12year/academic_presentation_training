@@ -89,6 +89,9 @@ and non-sensitive metadata.
 
 ## Baselines
 
+The separate fixed-prompt 90-script ArcBench study is documented in
+`experiments/baseline/README.md`. It uses the seed prompt without GEPA.
+
 The prototype compares:
 
 1. the unmodified `seed_v1_multimodal.md` prompt;
@@ -109,9 +112,7 @@ For every candidate script:
 3. run the fixed evaluator prompt with the YAML rubric;
 4. retain all seven dimension scores and the diagnostic feedback;
 5. divide the unweighted mean over applicable 1--5 scores by 5 to produce a
-   0--1 scalar; and
-6. set that example's scalar to 0 on a critical grounding error, retaining
-   its full diagnostic feedback for GEPA.
+   0.2--1.0 scalar. Factual errors are reflected in the grounding dimension.
 
 Equal weighting is a provisional engineering choice. Report the seven-score
 vector alongside any aggregate so an improvement in style cannot hide a loss
@@ -277,9 +278,9 @@ small, reviewed fixture is deliberately added for testing.
 
 Before calling an optimized prompt better than the seed prompt, require:
 
-- no increase in critical grounding-error rate;
+- no substantial unexplained regression in the grounding dimension;
 - an improvement in the preregistered aggregate on the held-out test set;
-- no substantial unexplained regression in any individual dimension;
+- no substantial unexplained regression in the other individual dimensions;
 - qualitative human review of representative gains and failures; and
 - reported token and monetary cost alongside quality results.
 

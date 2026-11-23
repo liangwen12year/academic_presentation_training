@@ -19,3 +19,7 @@ soundfile==0.12.1
 
 # GEPA prompt optimization (Python 3.10–3.13)
 gepa[full]==0.1.4
+
+# ArcBench baselines: Claude generation/evaluation and distribution plots
+anthropic>=2.8,<3
+matplotlib>=3.8,<4

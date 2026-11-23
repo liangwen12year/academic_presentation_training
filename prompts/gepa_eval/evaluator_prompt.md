@@ -78,9 +78,9 @@ Before returning the result:
 5. For each dimension, explain the score, cite the relevant evidence, list any
    problems, and suggest a concise improvement when needed. Use empty lists or
    an empty improvement string when there is no issue to report.
-6. Return the dimension-level judgments and any critical grounding error. Do
-   not calculate an aggregate or optimization score; the evaluation code will
-   calculate it from these results.
+6. Return the dimension-level judgments. Record factual errors in the grounding
+   score and its explanation. Do not calculate an aggregate or optimization
+   score; the evaluation code will calculate it from these results.
 
 ## Output schema
 
@@ -91,11 +91,7 @@ this example show the expected data types; they are not suggested scores.
 
 ```json
 {
-  "rubric_version": "1.0.0",
-  "critical_grounding_error": {
-    "present": false,
-    "claims": []
-  },
+  "rubric_version": "1.1.0",
   "dimensions": {
     "grounding": {
       "applicable": true,

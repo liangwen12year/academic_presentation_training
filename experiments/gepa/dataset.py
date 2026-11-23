@@ -1,7 +1,7 @@
 """Read and validate a local, deck-split manifest of rendered slide images.
 
 The manifest is JSON with an ``examples`` array. Each example has a ``split``
-(``train``, ``val``, or ``test``), ``example_id``, ``deck_id``, a one-based
+(``train``, ``val``, ``test``, or ``baseline``), ``example_id``, ``deck_id``, a one-based
 ``slide_number``, and ``target_slide_image``. Image paths are relative to the
 explicit ``image_root`` argument. Optional fields are listed in ``SlideExample``.
 
@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-SplitName = Literal["train", "val", "test"]
-_SPLITS: tuple[SplitName, ...] = ("train", "val", "test")
+SplitName = Literal["train", "val", "test", "baseline"]
+_SPLITS: tuple[SplitName, ...] = ("train", "val", "test", "baseline")
 _IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
 
@@ -37,15 +37,18 @@ class SlideExample:
     target_duration_seconds: float | None = None
     speaker_notes: str | None = None
     source_excerpt: str | None = None
+    position: str | None = None
+    slide_type: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class DatasetSplits:
-    """Examples partitioned by deck for optimization and final comparison."""
+    """Examples partitioned by deck for optimization or a fixed baseline."""
 
     train: tuple[SlideExample, ...]
     val: tuple[SlideExample, ...]
     test: tuple[SlideExample, ...]
+    baseline: tuple[SlideExample, ...]
 
 
 def _required_text(record: dict, key: str, row: int) -> str:
@@ -108,6 +111,8 @@ def _read_example(record: dict, row: int, root: Path) -> SlideExample:
         target_duration_seconds=duration,
         speaker_notes=_optional_text(record, "speaker_notes", row),
         source_excerpt=_optional_text(record, "source_excerpt", row),
+        position=_optional_text(record, "position", row),
+        slide_type=_optional_text(record, "slide_type", row),
     )
 
 
@@ -139,7 +144,7 @@ def load_manifest(manifest_path: Path | str, image_root: Path | str) -> DatasetS
             raise ValueError(f"Example {row} must be a JSON object")
         split = item.get("split")
         if split not in _SPLITS:
-            raise ValueError(f"Example {row}: split must be train, val, or test")
+            raise ValueError(f"Example {row}: split must be train, val, test, or baseline")
         example = _read_example(item, row, root)
         if example.example_id in seen_ids:
             raise ValueError(f"Duplicate example_id: {example.example_id}")
@@ -164,4 +169,5 @@ def load_manifest(manifest_path: Path | str, image_root: Path | str) -> DatasetS
         train=tuple(split_lists["train"]),
         val=tuple(split_lists["val"]),
         test=tuple(split_lists["test"]),
+        baseline=tuple(split_lists["baseline"]),
     )

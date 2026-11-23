@@ -7,6 +7,7 @@ are kept in files so a GEPA-selected instruction can be loaded unchanged.
 from __future__ import annotations
 
 import base64
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -146,6 +147,7 @@ def generate_script(
     model: str,
     max_output_tokens: int = 1600,
     reasoning_effort: str | None = None,
+    request_hook: Callable[[dict[str, Any]], None] | None = None,
 ) -> ModelResult:
     """Call a multimodal model with the candidate system instruction."""
 
@@ -154,16 +156,19 @@ def generate_script(
     kwargs: dict[str, Any] = {}
     if reasoning_effort:
         kwargs["reasoning"] = {"effort": reasoning_effort}
-    response = client.responses.create(
-        model=model,
-        input=[
+    request: dict[str, Any] = {
+        "model": model,
+        "input": [
             {"role": "system", "content": instructions},
             {"role": "user", "content": slide_content(slide)},
         ],
-        max_output_tokens=max_output_tokens,
-        store=False,
+        "max_output_tokens": max_output_tokens,
+        "store": False,
         **kwargs,
-    )
+    }
+    if request_hook is not None:
+        request_hook(request)
+    response = client.responses.create(**request)
     text = (response.output_text or "").strip()
     if not text:
         raise ValueError("Generation model returned no speaker script")

@@ -9,7 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-RUBRIC_VERSION = "1.0.0"
+RUBRIC_VERSION = "1.1.0"
 
 DIMENSION_NAMES = (
     "grounding",
@@ -34,19 +34,6 @@ class StrictResultModel(BaseModel):
     """Require every declared field and reject unexpected evaluator output."""
 
     model_config = ConfigDict(extra="forbid", strict=True)
-
-
-class CriticalGroundingError(StrictResultModel):
-    present: bool
-    claims: list[str]
-
-    @model_validator(mode="after")
-    def explain_critical_error(self) -> "CriticalGroundingError":
-        if self.present and not self.claims:
-            raise ValueError("A critical grounding error must identify a claim")
-        if not self.present and self.claims:
-            raise ValueError("Claims must be empty when no critical grounding error is present")
-        return self
 
 
 class DimensionEvaluation(StrictResultModel):
@@ -84,6 +71,5 @@ class Dimensions(StrictResultModel):
 
 
 class EvaluationResult(StrictResultModel):
-    rubric_version: Literal["1.0.0"]
-    critical_grounding_error: CriticalGroundingError
+    rubric_version: Literal["1.1.0"]
     dimensions: Dimensions

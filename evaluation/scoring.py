@@ -8,15 +8,11 @@ from evaluation.evaluator_schema import DIMENSION_NAMES, EvaluationResult
 
 
 def calculate_score(evaluation: EvaluationResult) -> float:
-    """Return a 0–1 score, with a critical grounding error scored at zero.
+    """Return a 0.2–1.0 score from the applicable dimension ratings.
 
     Each applicable dimension contributes its 1–5 score equally. Optional
     dimensions are omitted only when the evaluator marked them non-applicable.
-    A failing example is retained with a score of zero and diagnostic feedback.
     """
-
-    if evaluation.critical_grounding_error.present:
-        return 0.0
 
     scores = [
         dimension.score
