@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings
 
@@ -9,16 +9,19 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
     google_api_key: str = ""
     llm_provider: str = "openai"  # "openai" or "gemini"
     whisper_model: str = "base"  # tiny, base, small, medium, large
 
-    # Set SPEAKER_SCRIPT_PROMPT_PATH to enable image-based script generation.
+    # Opt in to image-based generation by setting SPEAKER_SCRIPT_PROMPT_PATH.
     # A relative path is resolved from base_dir when the presentation is read.
     speaker_script_prompt_path: Path | None = None
-    speaker_script_model: str = "gpt-5.4-mini"
-    speaker_script_reasoning_effort: str | None = None
+    speaker_script_provider: Literal["anthropic", "openai"] = "anthropic"
+    speaker_script_model: str | None = None
+    speaker_script_reasoning_effort: str = "medium"
     speaker_script_max_output_tokens: int = 1600
+    speaker_script_target_duration_seconds: float = 30.0
 
     base_dir: Path = Path(__file__).resolve().parent.parent
     upload_dir: Path = base_dir / "uploads"

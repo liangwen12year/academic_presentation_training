@@ -170,22 +170,48 @@ cp .env.example .env
 |----------|----------|-------------|
 | `ELEVENLABS_API_KEY` | Optional | ElevenLabs API key for high-quality TTS. Falls back to browser speech synthesis if not set. |
 | `OPENAI_API_KEY` | Optional | OpenAI key for generating scripts when slides lack speaker notes. Falls back to slide text. |
+| `ANTHROPIC_API_KEY` | Optional | Anthropic key for the image-based speaker-script generator when using Claude. |
 | `GOOGLE_API_KEY` | Optional | Alternative to OpenAI — Google Gemini for script generation. |
-| `LLM_PROVIDER` | Optional | `"openai"` (default) or `"gemini"` |
+| `LLM_PROVIDER` | Optional | `"openai"` (default) or `"gemini"` for the original text workflow. |
 | `WHISPER_MODEL` | Optional | Whisper model size: `tiny`, `base` (default), `small`, `medium`, `large`. Larger = more accurate but slower. |
+| `SPEAKER_SCRIPT_PROMPT_PATH` | Optional | Set to `prompts/speaker_script_gen/seed_v1_multimodal.md` to generate from slide images during upload. |
+| `SPEAKER_SCRIPT_PROVIDER` | Optional | `anthropic` (default) or `openai` for image-based generation. |
+| `SPEAKER_SCRIPT_MODEL` | Optional | Defaults to `claude-haiku-5-5` for Anthropic or `gpt-5.6-luna` for OpenAI. |
+| `SPEAKER_SCRIPT_REASONING_EFFORT` | Optional | Model effort setting; defaults to `medium`. |
+| `SPEAKER_SCRIPT_TARGET_DURATION_SECONDS` | Optional | Requested speaking time per slide; defaults to `30`. |
+
+To enable the new seed prompt with Claude Haiku 5.5, add these lines to `.env`:
+
+```dotenv
+ANTHROPIC_API_KEY=your-real-key
+SPEAKER_SCRIPT_PROMPT_PATH=prompts/speaker_script_gen/seed_v1_multimodal.md
+SPEAKER_SCRIPT_PROVIDER=anthropic
+```
+
+To use GPT-5.6 Luna for the same prompt, set `SPEAKER_SCRIPT_PROVIDER=openai`
+and `OPENAI_API_KEY` instead. You may set `SPEAKER_SCRIPT_MODEL` explicitly to
+override the default for either provider. Restart the server after changing
+`.env`. Each uploaded slide then triggers a model request containing its image,
+available neighboring slide images, presentation filename as title, optional
+PPTX speaker notes, and a 30-second speaking target. PDF uploads do not supply
+speaker notes. Model calls incur provider charges. If image generation is
+enabled without the selected provider's API key, the upload job
+reports an error. PPTX image generation also requires LibreOffice to render all
+slides. The evaluator and GEPA optimizer remain in the research workflow and
+are not called during app uploads.
 
 **The app works with zero API keys** — it degrades gracefully with the following fallback behavior:
 
 | Feature | With Valid API Key | Without Valid API Key |
 |---------|-------------------|----------------------|
-| **Script Generation** | LLM generates a natural speaker script from slide content (OpenAI GPT-4o-mini or Google Gemini) | Uses raw slide text as the script; if a slide has no text, defaults to "This is slide N." |
+| **Script Generation** | With `SPEAKER_SCRIPT_PROMPT_PATH`, Claude or GPT generates from slide images; otherwise the original text/notes workflow uses OpenAI or Gemini. | Without image generation enabled, uses notes or raw slide text; if a slide has no text, defaults to "This is slide N." |
 | **Golden Reference Audio** | High-quality ElevenLabs TTS with the default voice | Falls back to browser's built-in `SpeechSynthesis` API (voice quality varies by browser/OS). If the browser lacks `SpeechSynthesis`, an alert prompts the user to configure `ELEVENLABS_API_KEY`. |
 | **Pronunciation Playback** | Click a flagged word to hear correct pronunciation via ElevenLabs TTS | Falls back to browser `SpeechSynthesis`. If unavailable, pronunciation playback is disabled. |
 | **Recording & Analysis** | Fully functional — uses local Whisper model (no API key needed) | Same — Whisper runs locally, no external API required |
 | **Avatar Coach & Audience** | Fully functional — runs entirely client-side | Same — no API dependency |
 | **Real-time Coaching** | Fully functional — uses Web Audio API and Web Speech API | Same — no API dependency |
 
-> **Note:** A key is considered invalid if it is empty, unset, or starts with `your-` (the placeholder value from `.env.example`). Invalid keys are treated the same as missing keys — the app silently falls back rather than sending bad requests to external APIs.
+> **Note:** A key is considered invalid if it is empty, unset, or starts with `your-` (the placeholder value from `.env.example`). The original text workflow falls back when a key is missing. The image-based workflow reports a missing-key error so an upload cannot silently use a different generation method.
 
 ### Running
 
@@ -256,7 +282,7 @@ before redistributing any downloaded material.
 | Speech-to-text | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (CTranslate2, CPU int8) |
 | Text-to-speech | ElevenLabs API / Browser SpeechSynthesis |
 | PPTX parsing | python-pptx + Pillow |
-| Script generation | OpenAI GPT-4o-mini / Google Gemini 1.5 Flash |
+| Script generation | Claude Haiku 5.5 or GPT-5.6 Luna from slide images; original text workflow uses OpenAI or Gemini |
 | Word alignment | Dynamic programming with Levenshtein distance |
 | Avatar rendering | HTML5 Canvas 2D (procedural drawing, 60fps) |
 | Real-time analysis | Web Audio API (AnalyserNode) + Web Speech API |

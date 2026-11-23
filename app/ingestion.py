@@ -11,11 +11,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from anthropic import Anthropic
 from PIL import Image
 from openai import OpenAI
 from pptx import Presentation
 from pptx.util import Emu
 
+from app.anthropic_speaker_scripts import generate_script_claude
 from app.config import settings
 from app.speaker_scripts import SlideContext, generate_script, load_generation_instructions
 
@@ -223,25 +225,43 @@ def _extract_slide_text(slide) -> str:
     return "\n".join(texts)
 
 
-def _multimodal_setup() -> tuple[str, OpenAI] | None:
+@dataclass(frozen=True)
+class MultimodalGenerator:
+    instructions: str
+    provider: str
+    model: str
+    client: OpenAI | Anthropic
+
+
+def _multimodal_setup() -> MultimodalGenerator | None:
     """Load the selected prompt when image-based generation is enabled."""
 
     prompt_path = settings.speaker_script_prompt_path
     if prompt_path is None:
         return None
 
-    key = settings.openai_api_key.strip()
+    provider = settings.speaker_script_provider
+    key_name = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
+    key = (
+        settings.anthropic_api_key if provider == "anthropic" else settings.openai_api_key
+    ).strip()
     if not key or key.startswith("your-"):
         raise ValueError(
-            "SPEAKER_SCRIPT_PROMPT_PATH is set, but OPENAI_API_KEY is missing or a placeholder"
+            f"SPEAKER_SCRIPT_PROMPT_PATH is set, but {key_name} is missing or a placeholder"
         )
-    if not settings.speaker_script_model.strip():
-        raise ValueError("SPEAKER_SCRIPT_MODEL must name an image-capable OpenAI model")
+    model = settings.speaker_script_model or (
+        "claude-haiku-5-5" if provider == "anthropic" else "gpt-5.6-luna"
+    )
+    if not model.strip():
+        raise ValueError("SPEAKER_SCRIPT_MODEL must name an image-capable model")
+    if settings.speaker_script_target_duration_seconds <= 0:
+        raise ValueError("SPEAKER_SCRIPT_TARGET_DURATION_SECONDS must be positive")
 
     if not prompt_path.is_absolute():
         prompt_path = settings.base_dir / prompt_path
     instructions = load_generation_instructions(prompt_path)
-    return instructions, OpenAI(api_key=key)
+    client = Anthropic(api_key=key) if provider == "anthropic" else OpenAI(api_key=key)
+    return MultimodalGenerator(instructions, provider, model, client)
 
 
 def _presentation_title(filepath: Path) -> str:
@@ -259,8 +279,7 @@ async def _generate_multimodal_slide_script(
     pres_id: str,
     presentation_title: str,
     notes: str,
-    instructions: str,
-    client: OpenAI,
+    generator: MultimodalGenerator,
 ) -> str:
     """Generate one script using the target and available neighboring images."""
 
@@ -275,17 +294,29 @@ async def _generate_multimodal_slide_script(
             local_image(slide_index + 1) if slide_index + 1 < len(image_paths) else None
         ),
         presentation_title=presentation_title,
+        target_duration_seconds=settings.speaker_script_target_duration_seconds,
         speaker_notes=notes or None,
     )
-    result = await asyncio.to_thread(
-        generate_script,
-        instructions,
-        context,
-        client=client,
-        model=settings.speaker_script_model,
-        max_output_tokens=settings.speaker_script_max_output_tokens,
-        reasoning_effort=settings.speaker_script_reasoning_effort,
-    )
+    if generator.provider == "anthropic":
+        result = await asyncio.to_thread(
+            generate_script_claude,
+            generator.instructions,
+            context,
+            client=generator.client,
+            model=generator.model,
+            max_output_tokens=settings.speaker_script_max_output_tokens,
+            effort=settings.speaker_script_reasoning_effort,
+        )
+    else:
+        result = await asyncio.to_thread(
+            generate_script,
+            generator.instructions,
+            context,
+            client=generator.client,
+            model=generator.model,
+            max_output_tokens=settings.speaker_script_max_output_tokens,
+            reasoning_effort=settings.speaker_script_reasoning_effort,
+        )
     return result.text
 
 
@@ -399,9 +430,8 @@ async def ingest_pdf(
     slides: list[SlideData] = []
     for idx in range(len(image_paths)):
         if multimodal is not None:
-            instructions, client = multimodal
             script = await _generate_multimodal_slide_script(
-                image_paths, idx, pres_id, _presentation_title(filepath), "", instructions, client
+                image_paths, idx, pres_id, _presentation_title(filepath), "", multimodal
             )
         else:
             slide_text = page_texts[idx] if idx < len(page_texts) else ""
@@ -460,9 +490,8 @@ async def ingest_pptx(
         image_path = image_paths[idx]
         notes = slide_notes[idx]
         if multimodal is not None:
-            instructions, client = multimodal
             script = await _generate_multimodal_slide_script(
-                image_paths, idx, pres_id, _presentation_title(filepath), notes, instructions, client
+                image_paths, idx, pres_id, _presentation_title(filepath), notes, multimodal
             )
         elif notes:
             script = notes
