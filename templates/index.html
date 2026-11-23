@@ -55,6 +55,22 @@
             <label for="script-text">Speaker Script <span style="font-weight:normal;color:var(--text-secondary);">(editable)</span></label>
             <textarea id="script-text" placeholder="Script will appear here after upload..."></textarea>
           </div>
+
+          <!-- Pronunciation Feedback (shown with the analysis results; wide, so under the script) -->
+          <div id="pronunciation-card" class="card hidden" style="margin-top: 1rem;">
+            <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(▶ Reference: correct pronunciation, ▶ Yours: your recording)</span></div>
+            <div id="flagged-list" class="flagged-list"></div>
+          </div>
+
+          <!-- Pronunciation lookup: phonemes, stress and audio of any word or phrase -->
+          <div class="card" style="margin-top: 1rem;">
+            <div class="section-header">Check Pronunciation <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(not sure how to say a word or phrase? look it up)</span></div>
+            <form class="lookup-form" onsubmit="App.lookupWord(event)">
+              <input id="word-lookup-input" type="text" placeholder="e.g. hyperbole, or a record-breaking quarter" autocomplete="off" spellcheck="false">
+              <button class="btn btn-primary btn-sm" type="submit">Look up</button>
+            </form>
+            <div id="word-lookup-result"></div>
+          </div>
         </div>
 
         <!-- MIDDLE: Recording Controls -->
@@ -75,10 +91,6 @@
             <!-- Real-time Feedback Panel -->
             <div id="realtime-feedback" class="realtime-feedback hidden">
               <div class="rt-row">
-                <span class="rt-label">Pace</span>
-                <span id="rt-pace-indicator" class="rt-pace">--</span>
-              </div>
-              <div class="rt-row">
                 <span class="rt-label">Energy</span>
                 <div class="rt-energy-track">
                   <div id="rt-energy-bar" class="rt-energy-fill"></div>
@@ -91,7 +103,7 @@
               <div id="rt-alerts" class="rt-alerts"></div>
             </div>
 
-            <button id="btn-submit-recording" class="btn btn-primary btn-block" style="margin-top:0.75rem;" disabled onclick="App.submitRecording()">
+            <button id="btn-submit-recording" class="btn btn-primary btn-block" style="margin-top:0.75rem;" disabled>
               Analyze Recording
             </button>
           </div>
@@ -172,10 +184,6 @@
               <div class="section-header">Filler Words</div>
               <div id="filler-list" class="filler-summary"></div>
             </div>
-            <div style="margin-top: 1rem;">
-              <div class="section-header">Pronunciation Feedback <span style="font-weight:normal;font-size:0.8rem;color:var(--text-secondary);">(click to hear correct pronunciation)</span></div>
-              <div id="flagged-list" class="flagged-list"></div>
-            </div>
           </div>
         </div>
 
@@ -205,15 +213,11 @@
   <!-- Self-Assessment Modal -->
   <div id="rating-modal-overlay" class="analysis-modal-overlay">
     <div class="analysis-modal" style="max-width:480px;">
-      <button class="analysis-modal-close" onclick="App.closeRatingModal()">&times;</button>
+      <button class="analysis-modal-close" onclick="App.dismissRatingModal()">&times;</button>
 
       <div id="self-rating-panel" class="self-rating-panel">
         <div class="section-header">Your Self-Assessment</div>
-        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Rate yourself while the AI analyzes your recording.</p>
-        <div id="rating-analysis-status" style="font-size:0.8rem; color:var(--primary); margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
-          <span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
-          <span>Analyzing recording...</span>
-        </div>
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">Your analysis is ready. Rate yourself first, then see the results.</p>
         <div class="rating-row">
           <label class="rating-label">How Well You Think You Did?</label>
           <div class="star-rating" id="star-overall">

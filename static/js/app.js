@@ -205,17 +205,7 @@ const App = {
     const textarea = document.getElementById('script-text');
     textarea.value = slide.script;
 
-    // Reference audio — attach avatar speaking hooks
-    const refSection = document.getElementById('ref-audio-container');
-    if (slide.reference_audio_url) {
-      refSection.innerHTML = `<audio controls src="${slide.reference_audio_url}"></audio>`;
-      const audio = refSection.querySelector('audio');
-      audio.addEventListener('play', () => this.updateAvatarState('speaking'));
-      audio.addEventListener('pause', () => this.updateAvatarState('idle'));
-      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
-    } else {
-      refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
-    }
+    this.renderReferenceAudio();
 
     // Hide results column and close rating modal
     this.hideResultsColumn();
@@ -228,6 +218,23 @@ const App = {
     if (rtFeedback) rtFeedback.classList.add('hidden');
 
     this.updateAvatarState('idle');
+  },
+
+  // Golden reference player of the current slide (on its own, so generating a
+  // reference doesn't reset the slide and hide the analysis results)
+  renderReferenceAudio() {
+    const slide = this.state.slides[this.state.currentSlide];
+    // Reference audio — attach avatar speaking hooks
+    const refSection = document.getElementById('ref-audio-container');
+    if (slide.reference_audio_url) {
+      refSection.innerHTML = `<audio controls src="${slide.reference_audio_url}"></audio>`;
+      const audio = refSection.querySelector('audio');
+      audio.addEventListener('play', () => this.updateAvatarState('speaking'));
+      audio.addEventListener('pause', () => this.updateAvatarState('idle'));
+      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
+    } else {
+      refSection.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Not generated yet</p>';
+    }
   },
 
   // ── Script Editing ─────────────────────────────────────────────
@@ -247,14 +254,21 @@ const App = {
 
   showResultsColumn() {
     document.getElementById('results-column').classList.remove('hidden');
+    document.getElementById('pronunciation-card').classList.remove('hidden');
   },
 
   hideResultsColumn() {
     document.getElementById('results-column').classList.add('hidden');
+    document.getElementById('pronunciation-card').classList.add('hidden');
   },
 
   openRatingModal() {
     document.getElementById('rating-modal-overlay').classList.add('visible');
+  },
+
+  dismissRatingModal() {
+    this.closeRatingModal();
+    if (this.state.lastAnalysis) this.showResultsColumn();
   },
 
   closeRatingModal(event) {
@@ -302,7 +316,7 @@ const App = {
       const data = await res.json();
 
       this.state.slides[this.state.currentSlide].reference_audio_url = data.audio_url;
-      this.renderSlide();
+      this.renderReferenceAudio();
     } catch (err) {
       alert('Failed to generate reference: ' + err.message);
     } finally {
@@ -337,7 +351,7 @@ const App = {
       data.results.forEach((r) => {
         this.state.slides[r.slide_index].reference_audio_url = r.audio_url;
       });
-      this.renderSlide();
+      this.renderReferenceAudio();
     } catch (err) {
       alert('Failed: ' + err.message);
     } finally {
@@ -495,10 +509,12 @@ const App = {
           this.state.audioCtx.close().catch(() => {});
           this.state.audioCtx = null;
         }
+        this.state.recordingSeconds = (Date.now() - this.state.recordingStartedAt) / 1000;
         document.getElementById('recording-status').textContent = 'Recording complete';
         document.getElementById('btn-submit-recording').disabled = false;
       };
       recorder.start(1000);
+      this.state.recordingStartedAt = Date.now();
       this.state.mediaRecorder = recorder;
       this.state.isRecording = true;
 
@@ -544,8 +560,6 @@ const App = {
     const rtPanel = document.getElementById('realtime-feedback');
     if (rtPanel) {
       rtPanel.classList.remove('hidden');
-      document.getElementById('rt-pace-indicator').textContent = 'After recording';
-      document.getElementById('rt-pace-indicator').className = 'rt-pace';
       document.getElementById('rt-filler-count').textContent = '0';
       document.getElementById('rt-energy-bar').style.width = '0%';
       document.getElementById('rt-alerts').innerHTML = '';
@@ -644,10 +658,42 @@ const App = {
 
   async submitRecording() {
     if (!this.state.audioChunks.length) return;
+    const submitBtn = document.getElementById('btn-submit-recording');
+    submitBtn.disabled = true;  // one analysis per recording
 
     await this.saveScript();
 
-    // Show self-assessment immediately while analysis runs
+    // Analyze first (progress bar), then ask for the self-assessment, then show the results
+    this.updateAvatarState('thinking');
+    this.showAnalysisProgress(this.state.recordingSeconds || 0);
+    const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('slide_index', this.state.currentSlide);
+    form.append('audio', blob, 'recording.webm');
+    form.append('coach_mode', this.state.coachMode);
+
+    let analysis;
+    try {
+      const res = await fetch('/api/analyze', { method: 'POST', body: form });
+      if (!res.ok) {
+        const errText = await res.text();
+        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
+        throw new Error(errText);
+      }
+      analysis = await res.json();
+    } catch (err) {
+      this.hideLoading();
+      this.updateAvatarState('idle');
+      submitBtn.disabled = false;  // let them retry
+      alert('Analysis failed: ' + err.message);
+      return;
+    }
+
+    // Render into the (still hidden) results column; it is shown once the rating is submitted
+    this.renderAnalysis(analysis);
+    this.hideLoading();
+
     this.selfRatings = { overall: 0, confidence: 0 };
     const ratingBtn = document.getElementById('btn-submit-rating');
     if (ratingBtn) { ratingBtn.textContent = 'Submit & View Results'; ratingBtn.disabled = false; }
@@ -660,52 +706,6 @@ const App = {
     document.querySelectorAll('.rating-value').forEach((el) => el.textContent = '');
     this.initStarRatings();
     this.openRatingModal();
-
-    // Run analysis in background
-    this.updateAvatarState('thinking');
-    const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
-    const form = new FormData();
-    form.append('presentation_id', this.state.presentationId);
-    form.append('slide_index', this.state.currentSlide);
-    form.append('audio', blob, 'recording.webm');
-    form.append('coach_mode', this.state.coachMode);
-
-    this._pendingAnalysis = null;
-    this._analysisError = null;
-    const statusEl = document.getElementById('rating-analysis-status');
-    if (statusEl) {
-      statusEl.innerHTML = '<span class="spinner" style="width:14px;height:14px;border-width:2px;"></span><span>Analyzing recording...</span>';
-    }
-
-    try {
-      const res = await fetch('/api/analyze', { method: 'POST', body: form });
-      if (!res.ok) {
-        const errText = await res.text();
-        if (this._isSessionExpired(res, errText)) { this._handleSessionExpired(); return; }
-        throw new Error(errText);
-      }
-      this._pendingAnalysis = await res.json();
-    } catch (err) {
-      this._analysisError = err.message;
-    }
-
-    // Analysis done -- render results and show right panel regardless of rating
-    if (this._pendingAnalysis) {
-      this.renderAnalysis(this._pendingAnalysis);
-      this.showResultsColumn();
-    }
-
-    // Update status in rating modal
-    const statusEl2 = document.getElementById('rating-analysis-status');
-    if (statusEl2) {
-      if (this._pendingAnalysis) {
-        statusEl2.innerHTML = '<span style="color:var(--success);">Analysis complete. Results are now visible.</span>';
-      } else if (this._analysisError) {
-        statusEl2.innerHTML = '<span style="color:var(--danger);">Analysis failed.</span>';
-        this.closeRatingModal();
-        alert('Analysis failed: ' + this._analysisError);
-      }
-    }
   },
 
   // ── Render Analysis Results ────────────────────────────────────
@@ -796,24 +796,8 @@ const App = {
       fillerContainer.innerHTML = '<span style="color:var(--success);font-size:0.85rem;">No filler words detected!</span>';
     }
 
-    // Flagged words
-    const flaggedContainer = document.getElementById('flagged-list');
-    if (data.flagged_words.length) {
-      flaggedContainer.innerHTML = data.flagged_words
-        .map(
-          (fw) => `
-        <div class="flagged-item" onclick="App.pronounceWord('${fw.word.replace(/'/g, "\\'")}')">
-          <span class="flag-dot ${fw.flag}"></span>
-          <span class="word">${fw.word}</span>
-          <span class="reason">${fw.reason}</span>
-          <button class="listen-btn">🔊 Listen</button>
-        </div>`
-        )
-        .join('');
-    } else {
-      flaggedContainer.innerHTML =
-        '<p style="color:var(--success);font-size:0.85rem;">All words pronounced correctly!</p>';
-    }
+    // Pronunciation feedback (phone level, from the pronunciation service)
+    this.renderPronunciation(data.pronunciation);
 
     // Annotated transcript
     const transcriptEl = document.getElementById('transcript-text');
@@ -1006,13 +990,236 @@ const App = {
 
   // ── Pronunciation Playback ─────────────────────────────────────
 
-  async pronounceWord(word) {
+  // ── Pronunciation Feedback ────────────────────────────────────
+
+  renderPronunciation(result) {
+    const container = document.getElementById('flagged-list');
+    // A new recording: drop the decoded audio of the previous one
+    if (this._userAudio) this._userAudio.ctx.close();
+    this._userAudio = null;
+
+    if (!result) {
+      container.innerHTML = '<p class="pron-note">Pronunciation assessment is unavailable right now.</p>';
+      return;
+    }
+    const esc = this.escapeHtml;
+    const stressHtml = (w) => this.stressHtml(w.syllables, w.stress_source);
+
+    // Words whose most certain wrong phone is below 0.3 are more likely recognizer noise: not listed.
+    // On L2-ARCTIC, flagged words at 0.3 and above are equally precise (~0.73); below it, ~0.53.
+    const flagged = result.words.filter((w) => w.mispronounced && w.confidence >= 0.3);
+    const red = flagged.filter((w) => w.level === 'red').length;
+    const listed = new Set(flagged.map((w) => w.index));
+    const phrases = this.groupPhrases(flagged, result.words.length);
+
+    // A phrase's two cells span the rows of all its flagged words
+    const phraseCells = (p) => {
+      const span = result.words.slice(p.start, p.end + 1);
+      const text = span.map((w) => w.word).join(' ');
+      const shown = span.map((w) => (listed.has(w.index)
+        ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word))).join(' ');
+      const timed = span.filter((w) => w.start != null && w.end > w.start);
+      const yours = timed.length
+        ? `<button class="pron-play" onclick="App.playUserRange(${timed[0].start}, ${timed[timed.length - 1].end})" title="Your phrase">▶</button>` : '';
+      // A phrase shared by several words may wrap; a single word's phrase stays on one line
+      const multi = p.words.length > 1;
+      const rows = multi ? ` rowspan="${p.words.length}"` : '';
+      return `<td class="pron-phrase${multi ? ' pron-phrase-shared' : ''}"${rows}>
+          <div class="pron-phrase-body">
+            <button class="pron-play" data-text="${esc(text)}" onclick="App.pronouncePhrase(this.dataset.text)" title="Correct phrase">▶</button>
+            <span>${shown}</span>
+          </div>
+        </td>
+        <td${rows}>${yours}</td>`;
+    };
+
+    // ``i``: the word's phrase; ``k`` / ``n``: its place in the phrase and the phrase's word count
+    const row = (w, phrase, i, k, n) => {
+      const phones = w.phones
+        .filter((ph) => ph.expected !== ph.heard)
+        .map((ph) => `${esc(ph.expected || '∅')} → ${esc(ph.heard || '∅')}`).join(', ');
+      const yours = w.start != null && w.end > w.start
+        ? `<button class="pron-play" onclick="App.playUserRange(${w.start}, ${w.end})" title="Your pronunciation">▶</button>` : '';
+      // Rows of one phrase are separated by a dashed line only (tinted together on hover)
+      return `<tr data-phrase="${i}"${k < n - 1 ? ' class="pron-in-phrase"' : ''}>
+        <td>${w.mispronounced ? `<b class="pron-${w.level}">${esc(w.word)}</b>` : esc(w.word)}</td>
+        <td>${this.playButtonHtml(w.word, w.tts_phonemes, 'Correct pronunciation')}</td>
+        <td>${yours}</td>
+        ${phrase ? phraseCells(phrase) : ''}
+        <td class="ipa" title="Accepted: ${esc(w.accepted.map((a) => '/' + a + '/').join(', '))}">/${esc(w.expected)}/</td>
+        <td class="ipa">${w.mispronounced ? '/' + esc(w.heard) + '/' : '<span class="pron-ok">✓</span>'}</td>
+        <td class="ipa">${stressHtml(w)}</td>
+        <td>${w.confidence ?? ''}</td>
+        <td class="ipa">${phones}</td>
+      </tr>`;
+    };
+    const table = () => `<div class="pron-table-wrap"><table class="pron-table">
+      <thead><tr><th>Word</th><th>Reference</th><th>Yours</th><th>Phrase reference</th><th>Your phrase</th><th>Expected</th><th>Heard</th><th>Stress</th><th>Confidence</th><th>Phones (expected → heard)</th></tr></thead>
+      <tbody>${phrases.map((p, i) => p.words.map((w, k) => row(w, k === 0 ? p : null, i, k, p.words.length)).join('')).join('')}</tbody>
+    </table></div>`;
+
+    container.innerHTML = `
+      <p class="pron-note">${flagged.length
+        ? `<span class="pron-red">${red} red</span> (clearly different) and <span class="pron-yellow">${flagged.length - red} yellow</span> (possibly different) of ${result.words.length} words.`
+        : '<span class="pron-ok">All words pronounced as expected!</span>'}</p>
+      ${flagged.length ? table() : ''}`;
+
+    // Hovering any row of a phrase tints all of its rows
+    const tbody = container.querySelector('tbody');
+    if (tbody) {
+      const tint = (phrase) => tbody.querySelectorAll('tr').forEach((tr) =>
+        tr.classList.toggle('pron-hover', tr.dataset.phrase === phrase));
+      tbody.addEventListener('mouseover', (e) => tint(e.target.closest('tr')?.dataset.phrase));
+      tbody.addEventListener('mouseleave', () => tint(null));
+    }
+  },
+
+  // Flagged words (in script order) grouped into phrases: words at most PHRASE_JOIN words apart share
+  // one, padded by PHRASE_CONTEXT words on each side. Returns [{words, start, end}] (word positions).
+  groupPhrases(flagged, wordCount) {
+    const PHRASE_JOIN = 4, PHRASE_CONTEXT = 2;
+    const phrases = [];
+    for (const w of flagged) {
+      const last = phrases[phrases.length - 1];
+      if (last && w.index - last.words[last.words.length - 1].index <= PHRASE_JOIN) last.words.push(w);
+      else phrases.push({ words: [w] });
+    }
+    for (const p of phrases) {
+      p.start = Math.max(0, p.words[0].index - PHRASE_CONTEXT);
+      p.end = Math.min(wordCount - 1, p.words[p.words.length - 1].index + PHRASE_CONTEXT);
+    }
+    return phrases;
+  },
+
+  // ▶ that plays ``word`` read exactly as ``phonemes`` (see pronounceWord)
+  playButtonHtml(word, phonemes, title) {
+    const esc = this.escapeHtml;
+    const ph = phonemes ? ` data-alphabet="${esc(phonemes.alphabet)}" data-ph="${esc(phonemes.ph)}"` : '';
+    return `<button class="pron-play" data-word="${esc(word)}"${ph} onclick="App.pronounceWord(this.dataset.word, this.dataset)" title="${esc(title)}">▶</button>`;
+  },
+
+  escapeHtml(v) {
+    return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  },
+
+  // Expected stress: primary syllable bold, secondary underlined (expected only; stress is not assessed)
+  stressHtml(syllables, source) {
+    const esc = this.escapeHtml;
+    if (syllables.length < 2) return '<span class="pron-muted">–</span>';
+    const parts = syllables.map((syl) => syl.stress === 1 ? `<b>${esc(syl.ipa)}</b>`
+      : syl.stress === 2 ? `<u>${esc(syl.ipa)}</u>` : esc(syl.ipa));
+    const mark = source === 'espeak' ? '<span class="pron-muted" title="Not in the CMU dictionary, from espeak">*</span>' : '';
+    return parts.join('·') + mark;
+  },
+
+  async lookupWord(event) {
+    event.preventDefault();
+    const esc = this.escapeHtml;
+    const text = document.getElementById('word-lookup-input').value.trim();
+    const resultEl = document.getElementById('word-lookup-result');
+    if (!text) return;
+    try {
+      const res = await fetch(`/api/word-pronunciation?text=${encodeURIComponent(text)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Lookup failed');
+      resultEl.innerHTML = data.kind === 'phrase' ? this.lookupPhraseHtml(data) : this.lookupWordHtml(data);
+    } catch (err) {
+      resultEl.innerHTML = `<p class="pron-muted">${esc(err.message)}</p>`;
+    }
+  },
+
+  lookupWordHtml(data) {
+    const esc = this.escapeHtml;
+    const rows = data.pronunciations.map((p) => `
+      <div class="lookup-pron">
+        ${this.playButtonHtml(data.word, p.tts_phonemes, 'Hear this pronunciation')}
+        <span class="ipa">/${esc(p.ipa)}/</span>
+        <span class="ipa">${this.stressHtml(p.syllables, data.source)}</span>
+      </div>`).join('');
+    return `
+      <div class="lookup-head">
+        <span class="lookup-word">${esc(data.word)}</span>
+      </div>
+      ${rows}
+      <p class="pron-muted lookup-note">${data.pronunciations.length > 1
+        ? 'Several accepted pronunciations (e.g. noun vs verb, or regional variants). '
+        : ''}▶ plays each pronunciation as written. Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.source === 'espeak'
+        ? ' Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
+  },
+
+  // A phrase: read as a whole, then word by word with each word's phonemes and stress
+  lookupPhraseHtml(data) {
+    const esc = this.escapeHtml;
+    const rows = data.words.map((w) => `
+      <div class="lookup-pron">
+        ${this.playButtonHtml(w.word, w.tts_phonemes, 'Hear this word')}
+        <span class="lookup-phrase-word">${esc(w.word)}</span>
+        <span class="ipa">/${esc(w.ipa)}/</span>
+        <span class="ipa">${this.stressHtml(w.syllables, w.source)}</span>
+      </div>`).join('');
+    return `
+      <div class="lookup-head">
+        <button class="pron-play" data-text="${esc(data.text)}" onclick="App.pronouncePhrase(this.dataset.text)" title="Hear the phrase">▶</button>
+        <span class="lookup-word">${esc(data.text)}</span>
+      </div>
+      <p class="ipa lookup-phrase-ipa">/${data.words.map((w) => esc(w.ipa)).join(' ')}/</p>
+      ${rows}
+      <p class="pron-muted lookup-note">The first ▶ reads the whole phrase naturally; the others play each word as written. Stressed syllable in <b>bold</b>, secondary stress <u>underlined</u>.${data.words.some((w) => w.source === 'espeak')
+        ? ' * Not in the CMU dictionary; pronunciation guessed by espeak.' : ''}</p>`;
+  },
+
+  // Play seconds ``start`` to ``end`` of the user's recording (a word or a phrase)
+  async playUserRange(start, end) {
+    if (!this.state.audioChunks.length) return;
+    try {
+      // Decode the recording once, then play the word's slice of it
+      if (!this._userAudio) {
+        const ctx = new AudioContext();
+        const blob = new Blob(this.state.audioChunks, { type: 'audio/webm' });
+        this._userAudio = { ctx, buffer: await ctx.decodeAudioData(await blob.arrayBuffer()) };
+      }
+      const { ctx, buffer } = this._userAudio;
+      if (ctx.state === 'suspended') await ctx.resume();
+      if (this._userWordSource) this._userWordSource.stop();
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0, start, end - start);
+      this._userWordSource = source;
+    } catch (err) {
+      console.warn('Failed to play your pronunciation:', err);
+    }
+  },
+
+  async pronouncePhrase(text) {
+    this.updateAvatarState('demonstrating');
+    const form = new FormData();
+    form.append('presentation_id', this.state.presentationId);
+    form.append('text', text);
+    try {
+      const res = await fetch('/api/pronounce-phrase', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const audio = new Audio(data.audio_url);
+      audio.addEventListener('ended', () => this.updateAvatarState('idle'));
+      audio.play();
+    } catch (err) {
+      this.speakWithBrowser(text);
+    }
+  },
+
+  async pronounceWord(word, phonemes) {
     // Avatar demonstrates the word
     this.updateAvatarState('demonstrating');
 
     const form = new FormData();
     form.append('presentation_id', this.state.presentationId);
     form.append('word', word);
+    // Read exactly this pronunciation (the browser fallback below can't, it picks its own)
+    if (phonemes && phonemes.ph) {
+      form.append('alphabet', phonemes.alphabet);
+      form.append('ph', phonemes.ph);
+    }
 
     try {
       const res = await fetch('/api/pronounce', { method: 'POST', body: form });
@@ -1142,6 +1349,27 @@ const App = {
     }
   },
 
+  showAnalysisProgress(recordingSeconds) {
+    // Roughly measured on a 1-CPU server: Whisper + pronunciation take about as long as the recording
+    const estimateSeconds = 10 + 1.2 * recordingSeconds;
+    const startedAt = Date.now();
+    this.showLoading('Analyzing recording...');
+    document.getElementById('loading-progress').classList.remove('hidden');
+    const tick = () => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      // Never reach 100% before the analysis is actually done
+      const percent = Math.min(95, Math.round((elapsed / estimateSeconds) * 100));
+      const remaining = Math.ceil(estimateSeconds - elapsed);
+      this.updateUploadProgress(percent, 'Analyzing recording...');
+      document.getElementById('loading-elapsed').textContent = `Elapsed: ${this.formatDuration(Math.floor(elapsed))}`;
+      document.getElementById('loading-remaining').textContent = remaining > 0
+        ? `Estimated remaining: about ${this.formatDuration(remaining)}`
+        : 'Taking a little longer than expected...';
+    };
+    tick();
+    this.analysisTimer = setInterval(tick, 1000);
+  },
+
   formatDuration(totalSeconds) {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = String(totalSeconds % 60).padStart(2, '0');
@@ -1151,6 +1379,8 @@ const App = {
   hideLoading() {
     clearInterval(this.uploadElapsedTimer);
     this.uploadElapsedTimer = null;
+    clearInterval(this.analysisTimer);
+    this.analysisTimer = null;
     document.getElementById('loading-overlay').classList.add('hidden');
   },
 };

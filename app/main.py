@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
+import gc
 import json
+import re
 import shutil
 import threading
 import uuid
@@ -20,10 +23,24 @@ from starlette.requests import Request
 
 from app.config import settings
 from app.ingestion import PresentationData, ingest_pptx, ingest_pdf
-from app.tts import clone_voice, generate_reference_audio, generate_word_audio, get_cloned_voice_id
+from app.tts import (
+    clone_voice,
+    generate_phrase_audio,
+    generate_reference_audio,
+    generate_word_audio,
+    get_cloned_voice_id,
+)
 from app.analysis import analyze_recording
+from app.cmu_variants import ARPABET_TO_IPA
+from app.pronunciation import assess_pronunciation, load_model as load_pronunciation_model, lookup_text
 
 app = FastAPI(title="Presentation Training Coach")
+
+
+@app.on_event("startup")
+async def preload_pronunciation_model() -> None:
+    # Loading takes a while; do it in the background so the server starts answering right away
+    threading.Thread(target=load_pronunciation_model, daemon=True).start()
 
 app.mount("/static", StaticFiles(directory=str(settings.static_dir)), name="static")
 templates = Jinja2Templates(directory=str(settings.base_dir / "templates"))
@@ -32,6 +49,18 @@ templates = Jinja2Templates(directory=str(settings.base_dir / "templates"))
 sessions: dict[str, PresentationData] = {}
 upload_jobs: dict[str, dict] = {}
 upload_jobs_lock = threading.Lock()
+# One analysis at a time: with one CPU, parallel runs aren't faster, and their
+# memory peaks (Whisper + the phone model) would add up past the 2 GB instance.
+analysis_lock = asyncio.Lock()
+
+
+def _release_memory() -> None:
+    """Return memory freed by an analysis to the OS, so it doesn't creep up across requests."""
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):  # not glibc (e.g. macOS during development)
+        pass
 
 
 def _presentation_response(pres: PresentationData) -> dict:
@@ -281,11 +310,13 @@ async def analyze(
             except Exception:
                 pass
 
-    result = analyze_recording(
-        audio_path=rec_path,
-        script=slide.script,
-        reference_duration=ref_duration,
-    )
+    # One after the other: both are CPU-bound and running them together would raise peak memory
+    async with analysis_lock:
+        try:
+            result = await asyncio.to_thread(analyze_recording, rec_path, slide.script, ref_duration)
+            pronunciation = await asyncio.to_thread(assess_pronunciation, rec_path, slide.script)
+        finally:
+            _release_memory()
 
     print(
         f"[A/B] pres={presentation_id} slide={slide_index} "
@@ -302,6 +333,7 @@ async def analyze(
         "filler_count": result.filler_count,
         "filler_words": result.filler_words,
         "flagged_words": [asdict(fw) for fw in result.flagged_words],
+        "pronunciation": pronunciation,
         "coach_mode": coach_mode,
     }
 
@@ -310,17 +342,57 @@ async def analyze(
 async def pronounce_word(
     presentation_id: str = Form(...),
     word: str = Form(...),
+    alphabet: str | None = Form(None),
+    ph: str | None = Form(None),
 ):
-    """Generate pronunciation audio for a single word."""
+    """Generate pronunciation audio for a single word, read as ``ph`` when given."""
     pres = sessions.get(presentation_id)
     if not pres:
         raise HTTPException(404, "Presentation not found")
 
+    phonemes = None
+    if alphabet and ph:
+        valid = (
+            all(re.fullmatch(r"[A-Z]{1,2}[012]?", t) and t.rstrip("012") in ARPABET_TO_IPA for t in ph.split())
+            if alphabet == "cmu-arpabet"
+            else alphabet == "ipa" and len(ph) <= 80 and not re.search(r"[<>&\"\s]", ph)
+        )
+        if not valid:
+            raise HTTPException(400, "Invalid phonemes")
+        phonemes = {"alphabet": alphabet, "ph": ph}
+
     try:
-        audio_url = await generate_word_audio(word=word, pres_id=pres.id)
+        audio_url = await generate_word_audio(word=word, pres_id=pres.id, phonemes=phonemes)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"audio_url": audio_url, "word": word}
+
+
+@app.post("/api/pronounce-phrase")
+async def pronounce_phrase(presentation_id: str = Form(...), text: str = Form(...)):
+    """Generate reference audio for a phrase around mispronounced words."""
+    pres = sessions.get(presentation_id)
+    if not pres:
+        raise HTTPException(404, "Presentation not found")
+
+    text = " ".join(text.split())
+    if not text or len(text) > 300:
+        raise HTTPException(400, "Phrase must be 1-300 characters")
+
+    try:
+        audio_url = await generate_phrase_audio(text=text, pres_id=pres.id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"audio_url": audio_url}
+
+
+@app.get("/api/word-pronunciation")
+def word_pronunciation(text: str):
+    """Phonemes, syllables and stress of a word or phrase the user looks up."""
+    text = " ".join(text.replace("\u2019", "'").split())
+    if not re.fullmatch(r"[A-Za-z][A-Za-z'\-\s.,!?;:]{0,199}", text) or len(text.split()) > 30:
+        raise HTTPException(400, "Enter English words only (up to 30 words)")
+    return lookup_text(text)
 
 
 @app.post("/api/speak-feedback")
