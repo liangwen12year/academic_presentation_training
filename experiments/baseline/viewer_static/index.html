@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Speaker Script Review</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">ArcBench · qualitative review</p>
+      <h1>Speaker Script Review</h1>
+    </div>
+    <div class="run-info">
+      <label for="run-select">Viewing<select id="run-select" aria-label="Select baseline run"></select></label>
+      <span id="result-count"></span>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Example navigation">
+      <div class="filters">
+        <label>Find a slide<input id="search" type="search" placeholder="Deck or example ID"></label>
+        <div class="filter-row">
+          <label>Position<select id="position-filter"><option value="">All positions</option><option value="beginning">Beginning</option><option value="middle">Middle</option><option value="penultimate_page">Penultimate</option></select></label>
+          <label>Visual score<select id="visual-filter"><option value="">All ratings</option><option value="na">N/A</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+        </div>
+        <label>Sort<select id="sort"><option value="order">Deck order</option><option value="score-asc">Lowest score first</option><option value="score-desc">Highest score first</option></select></label>
+      </div>
+      <p class="list-count" id="list-count"></p>
+      <div id="example-list" class="example-list"></div>
+    </aside>
+    <main id="main" class="main" aria-live="polite">
+      <div class="empty">Loading examples…</div>
+    </main>
+  </div>
+</body>
+</html>

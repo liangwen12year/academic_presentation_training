@@ -1,0 +1,214 @@
+schema_version: "1.1.0"
+name: speaker_script_quality
+description: >-
+  Reference-free rubric for evaluating a candidate script spoken while one
+  research-presentation slide is displayed.
+
+intended_use:
+  - compare speaker-script generation prompts
+  - provide diagnostic feedback for GEPA prompt optimization
+  - support human and model-based evaluation using the same criteria
+
+unit_of_evaluation: one candidate script for one target slide
+
+evidence_priority:
+  - target_slide_image
+  - neighboring_slide_images
+  - speaker_notes_or_raw_script
+  - relevant_paper_or_source_excerpt
+
+general_rules:
+  - Judge only against supplied evidence; do not introduce outside knowledge.
+  - Missing optional evidence is not itself a defect.
+  - Do not treat a human or synthetic reference script as uniquely correct.
+  - Do not reward verbosity, slide-text copying, or unsupported specificity.
+  - Score each applicable dimension independently with an integer from 1 to 5.
+  - Use null only when a dimension explicitly permits not_applicable.
+
+scoring_scale:
+  1: seriously deficient
+  2: major revision needed
+  3: acceptable but meaningfully improvable
+  4: strong with minor limitations
+  5: excellent for the available evidence and task
+
+aggregation:
+  method: unweighted_mean_of_applicable_dimensions
+  report_dimension_vector: true
+  normalized_scalar_range: [0.2, 1.0]
+  calculation: mean_applicable_dimension_score_divided_by_5
+  note: >-
+    Equal weighting is the initial experimental default, not a validated claim
+    that all dimensions have identical importance. Always retain individual
+    scores so improvements in one dimension cannot conceal regressions in
+    another.
+
+dimensions:
+  grounding:
+    label: Grounded in the slide and supplied sources
+    question: >-
+      Are all substantive claims accurate and supported by the target slide or
+      supplied supporting evidence?
+    applicable: always
+    anchors:
+      1: >-
+        Contains a severe contradiction or consequential invented claim that
+        materially misrepresents the slide or source.
+      2: >-
+        Contains notable unsupported claims or misleading interpretations, but
+        the central message is not wholly contradicted.
+      3: >-
+        The central claims are supported, with minor imprecision, overstatement,
+        or ambiguity that should be corrected.
+      4: >-
+        Substantive claims are well supported; any issue is small and does not
+        change the audience's understanding.
+      5: >-
+        Every substantive claim is accurately and precisely grounded, with
+        uncertainty and source limitations handled responsibly.
+
+  main_takeaway:
+    label: Clear main takeaway
+    question: >-
+      Does the script communicate the single most important idea the audience
+      should retain instead of merely reading visible content?
+    applicable: always
+    anchors:
+      1: >-
+        The takeaway is absent, incorrect, or replaced by an indiscriminate
+        reading of slide elements.
+      2: >-
+        A possible takeaway is implied but remains unclear, poorly prioritized,
+        or obscured by details.
+      3: >-
+        A defensible takeaway is present, though it could be stated earlier,
+        more clearly, or with better prioritization.
+      4: >-
+        The main idea is clear and appropriately prioritized, with only minor
+        room for sharper emphasis.
+      5: >-
+        The script makes the slide's most important defensible idea immediately
+        clear and reinforces it with well-chosen evidence.
+
+  useful_context:
+    label: Useful context
+    question: >-
+      Does the script add concise, supported explanation of why the slide
+      matters, how to interpret it, or how it advances the larger argument?
+    applicable: always
+    anchors:
+      1: >-
+        Added context is fabricated, misleading, irrelevant, or actively
+        interferes with understanding.
+      2: >-
+        Context is mostly generic, weakly supported, excessive, or fails to
+        clarify why the slide matters.
+      3: >-
+        Provides some relevant and supported interpretation, but its value or
+        connection to the larger argument is limited.
+      4: >-
+        Adds concise, supported context that materially helps interpretation,
+        with only minor omissions or excess.
+      5: >-
+        Adds exactly the context needed to understand significance or
+        interpretation, without speculation or unnecessary detail.
+
+  spoken_naturalness:
+    label: Natural spoken delivery
+    question: >-
+      Does the script sound conversationally professional and comfortable to
+      say aloud within the requested speaking time?
+    applicable: always
+    anchors:
+      1: >-
+        Awkward, fragmentary, list-like, excessively dense, or clearly
+        unsuitable for spoken delivery.
+      2: >-
+        Frequently sounds written rather than spoken, with cumbersome
+        sentences, repetition, or impractical length.
+      3: >-
+        Generally speakable and professional, with some stiffness, complexity,
+        repetition, or timing concern.
+      4: >-
+        Natural and comfortable aloud, with only minor awkwardness or trimming
+        needed.
+      5: >-
+        Concise, conversationally professional, easy to articulate, and well
+        matched to the requested duration.
+
+  visual_reference:
+    label: Meaningful visual reference
+    question: >-
+      When a meaningful visual is present, does the script direct attention to
+      and accurately interpret the most relevant visual evidence?
+    applicable: >-
+      Apply when the target contains a figure, chart, table, diagram, equation,
+      image, annotation, or meaningful spatial/emphasized layout. Otherwise use
+      not_applicable.
+    anchors:
+      1: >-
+        Misreads the visual, directs attention to nonexistent evidence, or
+        makes an unsupported visual inference.
+      2: >-
+        Ignores a central visual or mentions it vaguely without helping the
+        audience understand what to notice.
+      3: >-
+        Refers accurately to a relevant visual element but offers limited
+        guidance or interpretation.
+      4: >-
+        Directs attention to the most useful visual evidence and explains its
+        relevance, with minor room for precision.
+      5: >-
+        Seamlessly guides attention to the decisive visual evidence, explains
+        exactly what it shows, and connects it to the takeaway without
+        overclaiming.
+
+  cross_slide_connection:
+    label: Connection across slides
+    question: >-
+      When neighboring-slide evidence is supplied, does the script connect the
+      current slide to the surrounding argument rather than insert a generic
+      transition?
+    applicable: >-
+      Apply when preceding- or following-slide evidence is supplied. Otherwise
+      use not_applicable.
+    anchors:
+      1: >-
+        Contradicts the neighboring context or asserts a false relationship
+        between slides.
+      2: >-
+        Provides no useful connection despite clear neighboring context, or
+        relies on a generic and distracting transition.
+      3: >-
+        Makes a reasonable but basic connection to at least one neighboring
+        idea.
+      4: >-
+        Clearly links the slide to the surrounding argument and helps the
+        audience follow the progression.
+      5: >-
+        Creates a precise, economical bridge that explains how the current
+        slide follows from what came before and, when useful, motivates what
+        comes next.
+
+  coherence:
+    label: Coherence
+    question: >-
+      Does the script form one compact line of reasoning in which every
+      sentence contributes to the same communicative purpose?
+    applicable: always
+    anchors:
+      1: >-
+        Statements are disconnected, contradictory, or ordered so poorly that
+        the argument is difficult to follow.
+      2: >-
+        The intended argument is partly visible but contains major jumps,
+        repetition, or competing purposes.
+      3: >-
+        Mostly follows a logical progression, with some weak transitions,
+        redundancy, or loosely connected material.
+      4: >-
+        Presents a clear, unified line of reasoning with only minor flow or
+        focus issues.
+      5: >-
+        Every sentence advances a compact and logically ordered explanation
+        connecting takeaway, evidence, context, and transition.

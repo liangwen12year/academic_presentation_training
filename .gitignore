@@ -5,3 +5,8 @@ uploads/
 static/slides/
 static/audio/
 *.pyc
+.DS_Store
+
+# Downloaded research corpora, derived metadata, and local practice records.
+# Recreate corpora with the scripts documented in README.md.
+data/

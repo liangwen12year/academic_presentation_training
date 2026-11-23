@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "decks": [
+    {
+      "deck_id": "arcbench_000",
+      "pdf": "slide0_3DLinker_-_An_E3_Equivariant_Variational_Autoencoder_ICML_2022.pdf",
+      "split": "train",
+      "slide_numbers": [2],
+      "target_duration_seconds": 30
+    },
+    {
+      "deck_id": "arcbench_001",
+      "pdf": "slide1_Contrastive_Mixture_of_Posteriors_for_Counterfactual_Inference_Data_Integration_and_Fairness_ICML_2022.pdf",
+      "split": "val",
+      "slide_numbers": [2],
+      "target_duration_seconds": 30
+    },
+    {
+      "deck_id": "arcbench_002",
+      "pdf": "slide2_Correct-N-Contrast_-_A_Contrastive_Approach_for_Improving_Robustness_to_Spurious_Correlations_ICML_2022.pdf",
+      "split": "test",
+      "slide_numbers": [2],
+      "target_duration_seconds": 30
+    }
+  ]
+}
